@@ -104,13 +104,13 @@ static Temp_temp munchExp(T_exp e) {
       		switch(e->u.BINOP.op) 
 		{
 		    case T_plus:
-          	    	emit(AS_Oper("addq `s0, `d0", L(left, NULL), L(left, L(right, NULL)), NULL));
+          	    	emit(AS_Oper("addq `s0, `d0", L(left, NULL), L(right, L(left, NULL)), NULL));
           	    	return r;
         	    case T_minus:
-          		emit(AS_Oper("subq `s0, `d0", L(left, NULL), L(left, L(right, NULL)), NULL));
+          		emit(AS_Oper("subq `s0, `d0", L(left, NULL), L(right, L(left, NULL)), NULL));
           		return r;
        	 	    case T_mul:
-          		emit(AS_Oper("imulq `s0, `d0", L(left, NULL), L(left, L(right, NULL)), NULL));
+          		emit(AS_Oper("imulq `s0, `d0", L(left, NULL), L(right, L(left, NULL)), NULL));
           		return r;
         	    case T_div: 
           		emit(AS_Move("movq `s0, `d0", L(F_RAX(), NULL), L(left, NULL)));
@@ -296,6 +296,23 @@ static void munchStm(T_stm s){
 
 AS_instrList F_codegen(F_frame f, T_stmList stmList) {
 	AS_instrList list;
+
+	Temp_enter(F_tempMap, F_RAX(), "%rax");
+ 	Temp_enter(F_tempMap, F_RBX(), "%rbx");
+ 	Temp_enter(F_tempMap, F_RCX(), "%rcx");
+ 	Temp_enter(F_tempMap, F_RDX(), "%rdx");
+ 	Temp_enter(F_tempMap, F_RSI(), "%rsi");
+ 	Temp_enter(F_tempMap, F_RDI(), "%rdi");
+ 	Temp_enter(F_tempMap, F_RSP(), "%rsp");
+ 	Temp_enter(F_tempMap, F_RBP(), "%rbp");
+ 	Temp_enter(F_tempMap, F_R8(), "%r8");
+ 	Temp_enter(F_tempMap, F_R9(), "%r9");
+ 	Temp_enter(F_tempMap, F_R10(), "%r10");
+ 	Temp_enter(F_tempMap, F_R11(), "%r11");
+ 	Temp_enter(F_tempMap, F_R12(), "%r12");
+ 	Temp_enter(F_tempMap, F_R13(), "%r13");
+ 	Temp_enter(F_tempMap, F_R14(), "%r14");
+ 	Temp_enter(F_tempMap, F_R15(), "%r15");
 
 	Temp_temp saved_rbx = Temp_newtemp();
   	Temp_temp saved_r12 = Temp_newtemp();

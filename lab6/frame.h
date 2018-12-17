@@ -29,6 +29,8 @@ F_access F_allocLocal(F_frame f, bool escape);
 
 T_exp F_externalCall(string s, T_expList args);
 
+Temp_tempList F_registers(void);
+
 Temp_temp F_FP(void);
 Temp_temp F_RV(void);
 

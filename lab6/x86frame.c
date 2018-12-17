@@ -236,10 +236,20 @@ Temp_tempList F_calleesaves(void)
 	return calleesaves;
 }
 
+static Temp_tempList registers = NULL;
+Temp_tempList F_registers(void)
+{
+	if(registers == NULL)
+	    registers = Temp_TempList(F_RAX(),Temp_TempList(F_RBX(),Temp_TempList(F_RCX(),Temp_TempList(F_RDX(),Temp_TempList(F_RSI(),Temp_TempList(F_RDI(),
+		Temp_TempList(F_R8(),Temp_TempList(F_R9(),Temp_TempList(F_R10(),Temp_TempList(F_R11(),Temp_TempList(F_R12(),Temp_TempList(F_R13(),Temp_TempList(F_R14(), 			Temp_TempList(F_R15(), NULL))))))))))))));
+
+	return registers;
+}
 
 T_exp F_Exp(F_access access, T_exp fp) {
 	if (access->kind == inFrame) 
-		return T_Mem(T_Binop(T_plus, fp, T_Const(access->u.offset)));
+	    return T_Mem(T_Binop(T_plus, fp, T_Const(access->u.offset)));
+
 	return T_Temp(access->u.reg);
 }
 
