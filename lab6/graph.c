@@ -169,4 +169,50 @@ void *G_look(G_table t, G_node node)
   return TAB_look(t, node);
 }
 
+G_nodeList G_unionNodeList(G_nodeList l1, G_nodeList l2){
+    	G_nodeList list = NULL;
+    	for(; l1; l1 = l1->tail)
+            list = G_NodeList(l1->head, list);
+
+    	for(; l2; l2 = l2->tail)
+	{
+            G_node node = l2->head;
+            if(!G_inNodeList(node, l1))
+            	list = G_NodeList(node, list);
+    	}
+    	return list;
+}
+
+G_nodeList G_minusNodeList(G_nodeList l1, G_nodeList l2){
+    	G_nodeList list = NULL;
+    	for(; l1; l1 = l1->tail)
+	{
+            G_node node = l1->head;
+            if(!G_inNodeList(node, l2))
+            	list = G_NodeList(node, list);
+    	}
+    	return list;
+}
+
+G_nodeList G_removeNode(G_node node, G_nodeList l){
+    	G_nodeList last = NULL;
+    	for (G_nodeList p = l; p; p = p->tail)
+	{
+            if(p->head == node)
+	    {
+            	if(last)
+		{
+                    last->tail = p->tail;
+                    break;
+            	}
+            	else
+		{
+                    l = l->tail;
+                    break;
+            	}
+            }
+            last = p;
+    	}
+    	return l;
+}
 
