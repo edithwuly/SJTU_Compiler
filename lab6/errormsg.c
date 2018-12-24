@@ -54,6 +54,15 @@ va_list ap;
   fprintf(stderr,"\n");
 }
 
+void EM_impossible(char *message,...){
+  anyErrors=TRUE;
+  va_list ap;
+  va_start(ap,message);
+  vfprintf(stderr, message, ap);
+  va_end(ap);
+  fprintf(stderr,"\n");
+}
+
 void EM_reset(string fname)
 {
  anyErrors=FALSE; fileName=fname; lineNum=1;

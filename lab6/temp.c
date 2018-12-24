@@ -28,7 +28,7 @@ static int labels = 0;
 
 Temp_label Temp_newlabel(void)
 {char buf[100];
- sprintf(buf,"L%d",labels++);
+ sprintf(buf,".L%d",labels++);
  return Temp_namedlabel(String(buf));
 }
 
@@ -114,5 +114,78 @@ void Temp_dumpMap(FILE *out, Temp_map m) {
   if (m->under) {
      fprintf(out,"---------\n");
      Temp_dumpMap(out,m->under);
+  }
+}
+
+//my helper funcs
+
+Temp_tempList Temp_catList(Temp_tempList a, Temp_tempList b){
+    Temp_tempList li = NULL;
+    for(Temp_tempList p=a;p;p=p->tail){
+        li = Temp_TempList(p->head,li);
+    }
+    for(Temp_tempList p=b;p;p=p->tail){
+        li = Temp_TempList(p->head,li);
+    }
+    return li;
+}
+
+bool Temp_inList(Temp_tempList list, Temp_temp t){
+	for(;list;list=list->tail){
+		Temp_temp tt = list->head;
+		if(Temp_int(tt) == Temp_int(t)){
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+
+Temp_tempList Temp_Union(Temp_tempList A, Temp_tempList B){
+	Temp_tempList list = NULL;
+	for(;A;A=A->tail){
+		Temp_temp tt = A->head;
+		list = Temp_TempList(tt, list);
+	}
+	//Temp_tempList list = A;
+	for(;B;B=B->tail){
+		Temp_temp tt = B->head;
+		if(!Temp_inList(A, tt)){
+			list = Temp_TempList(tt, list);
+		}
+	}
+	return list;
+}
+Temp_tempList Temp_UnionCombine(Temp_tempList A, Temp_tempList B){
+  Temp_tempList list = A;
+	for(;B;B=B->tail){
+		Temp_temp tt = B->head;
+		if(!Temp_inList(A, tt)){
+			list = Temp_TempList(tt, list);
+		}
+	}
+	return list;
+}
+Temp_tempList Temp_Minus(Temp_tempList A, Temp_tempList B){
+	Temp_tempList list = NULL;
+	for(;A;A=A->tail){
+		Temp_temp tt = A->head;
+		if(!Temp_inList(B, tt)){
+			list = Temp_TempList(tt, list);
+		}
+	}
+	return list;
+}
+bool Temp_Equal(Temp_tempList A, Temp_tempList B){
+	if(Temp_Minus(A,B)==NULL && Temp_Minus(B,A)==NULL){
+		return TRUE;
+	}
+	return FALSE;
+}
+
+void Temp_replace(Temp_temp old, Temp_temp fresh, Temp_tempList li){
+  for(Temp_tempList p=li;p;p=p->tail){
+    if(p->head == old) 
+      p->head=fresh;
   }
 }

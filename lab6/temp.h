@@ -32,4 +32,13 @@ void Temp_dumpMap(FILE *out, Temp_map m);
 
 Temp_map Temp_name(void);
 
+Temp_tempList Temp_catList(Temp_tempList a, Temp_tempList b);
+bool Temp_inList(Temp_tempList list, Temp_temp t);
+Temp_tempList Temp_Union(Temp_tempList A, Temp_tempList B);
+Temp_tempList Temp_UnionCombine(Temp_tempList A, Temp_tempList B);
+Temp_tempList Temp_Minus(Temp_tempList A, Temp_tempList B);
+bool Temp_Equal(Temp_tempList A, Temp_tempList B);
+void Temp_replace(Temp_temp old, Temp_temp fresh, Temp_tempList li);
+
+
 #endif

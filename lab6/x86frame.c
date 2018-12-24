@@ -10,15 +10,21 @@
 #include "frame.h"
 
 /*Lab5: Your implementation here.*/
-const int F_wordSize = 8;
 
-//varibales
+const int F_wordsize = 8;
+
+//F_frame_ in PPT
 struct F_frame_ {
+	Temp_label name;	
 	F_accessList formals;
-	Temp_label name;
+	F_accessList locals;
+	int argSize;
 	int size;
+	F_accessList calleesaves;
+	F_accessList callersaves;
 };
 
+//varibales
 struct F_access_ {
 	enum {inFrame, inReg} kind;
 	union {
@@ -27,65 +33,133 @@ struct F_access_ {
 	} u;
 };
 
-F_accessList F_AccessList(F_access head, F_accessList tail) {
-	F_accessList temp = checked_malloc(sizeof(*temp));
-	temp->head = head;
-	temp->tail = tail;
-	return temp;
+/* functions */
+static F_access InFrame(int offset){
+	F_access ac = checked_malloc(sizeof(*ac));
+
+	ac->kind = inFrame;
+	ac->u.offset = offset;
+	return ac;
+}   
+int F_getFrameOff(F_access acc){
+	return acc->u.offset;
 }
 
-static F_access InFrame(int offset) {
-	F_access temp = checked_malloc(sizeof(*temp));
-	temp->kind = inFrame;
-	temp->u.offset = offset;
-	return temp;
+static F_access InReg(Temp_temp reg){
+	F_access ac = checked_malloc(sizeof(*ac));
+
+	ac->kind = inReg;
+	ac->u.reg = reg;
+	return ac;
 }
 
-static F_access InReg(Temp_temp reg) {
-	F_access temp = checked_malloc(sizeof(*temp));
-	temp->kind = inReg;
-	temp->u.reg = reg;
-	return temp;
+F_accessList F_AccessList(F_access head, F_accessList tail){
+	F_accessList l = checked_malloc(sizeof(*l));
+
+	l->head = head;
+	l->tail = tail;
+	return l;
 }
 
-static F_accessList Formals(U_boolList formals, int offset) {
-	if (formals)
-		return F_AccessList(InFrame(offset), Formals(formals->tail ,offset + F_wordSize));
+F_accessList makeFormals(F_frame f, U_boolList formals, int* cntp){
+	if(!formals)
+	    return NULL;
 
-	return NULL;
+	bool esc = formals->head;
+	(*cntp)++;
+	F_access ac = F_allocLocal(f, esc);//args;
+	
+	return F_AccessList(ac, makeFormals(f, formals->tail, cntp));
 }
 
-F_frame F_newFrame(Temp_label name, U_boolList formals) {
-	F_frame temp = checked_malloc(sizeof(*temp));
-	temp->formals = Formals(formals, F_wordSize);
-	temp->name = name;
-	temp->size = 0;
-	return temp;
+F_accessList F_callerPos(F_frame f){
+	Temp_tempList regs =  F_callerSave();
+	F_accessList l = NULL;
+	F_accessList last = NULL;
+	for(;regs;regs=regs->tail){
+		F_access acc = F_allocLocal(f,FALSE);
+		if(!last){
+			last = F_AccessList(acc, NULL);
+			l = last;
+		}
+		else{
+			last->tail = F_AccessList(acc, NULL);
+			last = last->tail;
+		}
+	}
+	return l;
 }
 
-Temp_label F_name(F_frame f) {
+F_accessList F_calleePos(F_frame f){
+	Temp_tempList regs = F_calleeSave();
+	F_accessList l = NULL;
+	F_accessList last = NULL;
+	for(;regs;regs=regs->tail){
+		F_access acc = F_allocLocal(f,FALSE);
+		if(!last){
+			last = F_AccessList(acc, NULL);
+			l = last;
+		}
+		else{
+			last->tail = F_AccessList(acc, NULL);
+			last = last->tail;
+		}
+	}
+	return l;
+}
+
+F_frame F_newFrame(Temp_label name, U_boolList formals){
+	F_frame f = checked_malloc(sizeof(*f));
+	f->size = 0;
+	int *argsize = checked_malloc(sizeof(int));
+	*argsize = 0;
+	f->name = name;
+	f->formals = makeFormals(f, formals, argsize);
+	f->locals = NULL;
+	f->argSize = *argsize;
+	
+
+	f->calleesaves = F_calleePos(f);
+	f->callersaves = F_callerPos(f);
+
+	return f;
+}
+
+F_access F_allocLocal(F_frame f, bool escape){
+	int size = f->size;
+	F_accessList locals = f->locals;
+
+	F_access ac;
+	if(escape)
+	{
+	    ac = InFrame(-(size+1) * F_wordsize);
+	    f->size++;
+	}
+	else
+	    ac = InReg(Temp_newtemp());
+	
+	f->locals = F_AccessList(ac, locals);
+
+	return ac;
+}
+
+Temp_label F_name(F_frame f){
 	return f->name;
 }
-
-F_accessList F_formals(F_frame f) {
+F_accessList F_formals(F_frame f){
 	return f->formals;
 }
-
-F_access F_allocLocal(F_frame f, bool escape) {
-	if (escape) 
-	{
-		f->size++;
-		int offset = -(f->size * F_wordSize);
-		return InFrame(offset);
-	} 
-
-	return InReg(Temp_newtemp());
+int F_size(F_frame f){
+	return f->size;
 }
 
 static Temp_temp rax = NULL;
 Temp_temp F_RAX(void) {
 	if(rax == NULL)
+	{
 	    rax = Temp_newtemp();
+	    Temp_enter(F_tempMap, rax, "%rax");
+	}
 
 	return rax;
 }
@@ -93,7 +167,10 @@ Temp_temp F_RAX(void) {
 static Temp_temp rbx = NULL;
 Temp_temp F_RBX(void) {
 	if(rbx == NULL)
+	{
 	    rbx = Temp_newtemp();
+	    Temp_enter(F_tempMap, rbx, "%rbx");
+	}
 
 	return rbx;
 }
@@ -101,7 +178,10 @@ Temp_temp F_RBX(void) {
 static Temp_temp rcx = NULL;
 Temp_temp F_RCX(void) {
 	if(rcx == NULL)
+	{
 	    rcx = Temp_newtemp();
+	    Temp_enter(F_tempMap, rcx, "%rcx");
+	}
 
 	return rcx;
 }
@@ -109,7 +189,10 @@ Temp_temp F_RCX(void) {
 static Temp_temp rdx = NULL;
 Temp_temp F_RDX(void) {
 	if(rdx == NULL)
+	{
 	    rdx = Temp_newtemp();
+	    Temp_enter(F_tempMap, rdx, "%rdx");
+	}
 
 	return rdx;
 }
@@ -117,7 +200,10 @@ Temp_temp F_RDX(void) {
 static Temp_temp rsi = NULL;
 Temp_temp F_RSI(void) {
 	if(rsi == NULL)
+	{
 	    rsi = Temp_newtemp();
+	    Temp_enter(F_tempMap, rsi, "%rsi");	
+	}
 
 	return rsi;
 }
@@ -125,7 +211,10 @@ Temp_temp F_RSI(void) {
 static Temp_temp rdi = NULL;
 Temp_temp F_RDI(void) {
 	if(rdi == NULL)
+	{
 	    rdi = Temp_newtemp();
+	    Temp_enter(F_tempMap, rdi, "%rdi");
+	}
 
 	return rdi;
 }
@@ -133,7 +222,10 @@ Temp_temp F_RDI(void) {
 static Temp_temp rsp = NULL;
 Temp_temp F_RSP(void) {
 	if(rsp == NULL)
+	{
 	    rsp = Temp_newtemp();
+	    Temp_enter(F_tempMap, rsp, "%rsp");
+	}
 
 	return rsp;
 }
@@ -141,7 +233,10 @@ Temp_temp F_RSP(void) {
 static Temp_temp rbp = NULL;
 Temp_temp F_RBP(void) {
 	if(rbp == NULL)
+	{
 	    rbp = Temp_newtemp();
+	    Temp_enter(F_tempMap, rbp, "%rbp");
+	}
 
 	return rbp;
 }
@@ -149,7 +244,10 @@ Temp_temp F_RBP(void) {
 static Temp_temp r8 = NULL;
 Temp_temp F_R8(void) {
 	if(r8 == NULL)
+	{
 	    r8 = Temp_newtemp();
+	    Temp_enter(F_tempMap, r8, "%r8");
+	}
 
 	return r8;
 }
@@ -157,7 +255,10 @@ Temp_temp F_R8(void) {
 static Temp_temp r9 = NULL;
 Temp_temp F_R9(void) {
 	if(r9 == NULL)
+	{
 	    r9 = Temp_newtemp();
+	    Temp_enter(F_tempMap, r9, "%r9");
+	}
 
 	return r9;
 }
@@ -165,7 +266,10 @@ Temp_temp F_R9(void) {
 static Temp_temp r10 = NULL;
 Temp_temp F_R10(void) {
 	if(r10 == NULL)
+	{
 	    r10 = Temp_newtemp();
+	    Temp_enter(F_tempMap, r10, "%r10");
+	}
 
 	return r10;
 }
@@ -173,7 +277,10 @@ Temp_temp F_R10(void) {
 static Temp_temp r11 = NULL;
 Temp_temp F_R11(void) {
 	if(r11 == NULL)
+	{
 	    r11 = Temp_newtemp();
+	    Temp_enter(F_tempMap, r11, "%r11");
+	}
 
 	return r11;
 }
@@ -181,7 +288,10 @@ Temp_temp F_R11(void) {
 static Temp_temp r12 = NULL;
 Temp_temp F_R12(void) {
 	if(r12 == NULL)
+	{
 	    r12 = Temp_newtemp();
+	    Temp_enter(F_tempMap, r12, "%r12");
+	}
 
 	return r12;
 }
@@ -189,7 +299,10 @@ Temp_temp F_R12(void) {
 static Temp_temp r13 = NULL;
 Temp_temp F_R13(void) {
 	if(r13 == NULL)
+	{
 	    r13 = Temp_newtemp();
+	    Temp_enter(F_tempMap, r13, "%r13");
+	}
 
 	return r13;
 }
@@ -197,7 +310,10 @@ Temp_temp F_R13(void) {
 static Temp_temp r14 = NULL;
 Temp_temp F_R14(void) {
 	if(r14 == NULL)
+	{
 	    r14 = Temp_newtemp();
+	    Temp_enter(F_tempMap, r14, "%r14");
+	}
 
 	return r14;
 }
@@ -205,78 +321,189 @@ Temp_temp F_R14(void) {
 static Temp_temp r15 = NULL;
 Temp_temp F_R15(void) {
 	if(r15 == NULL)
+	{
 	    r15 = Temp_newtemp();
+	    Temp_enter(F_tempMap, r15, "%r15");
+	}
 
 	return r15;
 }
 
-Temp_temp F_FP(void) {
-	return F_RBP();
+static Temp_temp fp  = NULL;
+Temp_temp F_FP(void){
+	
+	if(!fp){
+		fp = Temp_newtemp();
+		Temp_enter(F_tempMap, fp, "fp");
+	}
+	return fp;
 }
-
-Temp_temp F_RV(void) {
+Temp_temp F_SP(void){
+	return F_RSP();
+}
+Temp_temp F_RV(void){
 	return F_RAX();
 }
-
-static Temp_tempList callersaves = NULL;
-Temp_tempList F_callersaves(void)
-{
-	if(callersaves == NULL) 
-	    callersaves = Temp_TempList(F_RDI(),Temp_TempList(F_RSI(),Temp_TempList(F_RDX(), Temp_TempList(F_RCX(), Temp_TempList(F_R8(), Temp_TempList(F_R9(), NULL))))));
-
-	return callersaves;
+Temp_temp F_ARG(int idx){
+	switch(idx){
+		case 0:return F_RDI();
+		case 1:return F_RSI();
+		case 2:return F_RDX();
+		case 3:return F_RCX();
+		case 4:return F_R8();
+		case 5:return F_R9();
+		default:assert(0);
+	}
 }
 
-static Temp_tempList calleesaves = NULL;
-Temp_tempList F_calleesaves(void)
-{
-	if(calleesaves == NULL)
-	    calleesaves = Temp_TempList(F_RBX(),Temp_TempList(F_R12(), Temp_TempList(F_R13(), Temp_TempList(F_R14(), Temp_TempList(F_R15(), NULL)))));
-
-	return calleesaves;
+static Temp_tempList args = NULL;
+Temp_tempList F_Args(){
+	if(!args){
+		args = Temp_TempList(F_RDI(),Temp_TempList(F_RSI(),Temp_TempList(F_RDX(),Temp_TempList(F_RCX(),Temp_TempList(F_R8(),Temp_TempList(F_R9(),NULL))))));
+	}
+	return args;
 }
 
-static Temp_tempList registers = NULL;
-Temp_tempList F_registers(void)
-{
-	if(registers == NULL)
-	    registers = Temp_TempList(F_RAX(),Temp_TempList(F_RBX(),Temp_TempList(F_RCX(),Temp_TempList(F_RDX(),Temp_TempList(F_RSI(),Temp_TempList(F_RDI(),
-		Temp_TempList(F_R8(),Temp_TempList(F_R9(),Temp_TempList(F_R10(),Temp_TempList(F_R11(),Temp_TempList(F_R12(),Temp_TempList(F_R13(),Temp_TempList(F_R14(), 			Temp_TempList(F_R15(), NULL))))))))))))));
-
-	return registers;
+static Temp_tempList callerSave = NULL;
+Temp_tempList F_callerSave(){
+	if(!callerSave){
+		callerSave = Temp_catList(F_Args(), Temp_TempList(F_R10(), Temp_TempList(F_R11(), NULL)));
+	}
+	return callerSave;
 }
 
-T_exp F_Exp(F_access access, T_exp fp) {
-	if (access->kind == inFrame) 
-	    return T_Mem(T_Binop(T_plus, fp, T_Const(access->u.offset)));
-
-	return T_Temp(access->u.reg);
+static Temp_tempList calleeSave = NULL;
+Temp_tempList F_calleeSave(){	
+	if(!calleeSave){
+		calleeSave = Temp_TempList(F_R12(),Temp_TempList(F_R13(),Temp_TempList(F_R14(),Temp_TempList(F_R15(),Temp_TempList(F_RBX(),Temp_TempList(F_RBP(), NULL))))));
+	}
+	return calleeSave;
 }
 
-F_frag F_StringFrag(Temp_label label, string str) {  
-	F_frag temp = checked_malloc(sizeof(*temp));
-	temp->kind = F_stringFrag;
-	temp->u.stringg.label = label;
-	temp->u.stringg.str = str;
-	return temp;
+static Temp_tempList regs = NULL;
+Temp_tempList F_register(){
+	if(!regs){
+		regs = Temp_TempList(F_RSP(),Temp_TempList(F_RAX(),F_calleeSave()));
+		regs = Temp_catList(regs, F_callerSave());
+	}
+	return regs;											
+}
+
+T_exp F_exp(F_access acc, T_exp framePtr){
+	if(acc->kind == inFrame){
+		int off = acc->u.offset;
+		return T_Mem(T_Binop(T_plus, T_Const(off), framePtr));
+	}
+	else{
+		return T_Temp(acc->u.reg);
+	}
+}
+
+T_exp F_externalCall(string s, T_expList args){
+	return T_Call(T_Name(Temp_namedlabel(s)), args);
+}
+
+
+/* fragment */
+F_frag F_StringFrag(Temp_label label, string str) { 
+	F_frag f = checked_malloc(sizeof(*f));
+	f->kind = F_stringFrag;
+	f->u.stringg.label = label;
+	f->u.stringg.str = str;
+
+	return f;                                      
 }                                                     
                                                       
 F_frag F_ProcFrag(T_stm body, F_frame frame) {        
-	F_frag temp = checked_malloc(sizeof(*temp));
-	temp->kind = F_procFrag;
-	temp->u.proc.body = body;
-	temp->u.proc.frame = frame;
-	return temp;
-}                                                    
+	F_frag f = checked_malloc(sizeof(*f));
+	f->kind = F_procFrag;
+	f->u.proc.body = body;
+	f->u.proc.frame = frame;
+
+	return f;                                     
+}                                                     
                                                       
 F_fragList F_FragList(F_frag head, F_fragList tail) { 
-	F_fragList temp = checked_malloc(sizeof(*temp));
-	temp->head = head;
-	temp->tail = tail;
-	return temp;                 
-}      
+	F_fragList l = checked_malloc(sizeof(*l));
+	l->head = head;
+	l->tail = tail;
+	return l;                                      
+}                                                     
 
-T_exp F_externalCall(string s, T_expList args) {
-	return T_Call(T_Name(Temp_namedlabel(s)), args);
-}                                               
+T_stm F_procEntryExit1(F_frame f, T_stm stm){
+	//view change
+	T_stm view = NULL;
+	int cnt = 0;
+	T_exp fp = T_Temp(F_FP());
+	for(F_accessList l=f->formals;l;l=l->tail){
+		F_access arg = l->head;
+		T_exp argpos = F_exp(arg,fp);
+		switch(cnt){
+			case 0:view=T_Move(argpos,T_Temp(F_ARG(cnt)));break;//rdi SL
+			case 1://rsi
+			case 2://rdx
+			case 3://rcx
+			case 4://r8
+			case 5:view = T_Seq(T_Move(argpos,T_Temp(F_ARG(cnt))),
+								view);break;//r9
+			default:{
+				int off = (cnt-6+1)*F_wordsize ;
+				view = T_Seq(
+						T_Move(argpos,T_Mem(T_Binop(T_plus, T_Const(off), fp))),view);
+			}
+		}
+		cnt += 1;
+	}
+
+	//callee save
+	T_stm save = NULL;
+	F_accessList al = f->calleesaves;
+	Temp_tempList tl = F_calleeSave();
+	for(;tl;tl=tl->tail, al=al->tail){
+		T_exp pos = F_exp(al->head, fp);
+		if(save){
+			save = T_Seq(T_Move(pos, T_Temp(tl->head)), save);
+		}
+		else{
+			save = T_Move(pos, T_Temp(tl->head));
+		}
+	}
+
+	//callee restore
+	T_stm restore = NULL;
+	al = f->calleesaves;
+	tl = F_calleeSave();
+	for(;tl;tl=tl->tail, al=al->tail){
+		T_exp pos = F_exp(al->head, fp);
+		if(restore){
+			restore = T_Seq(T_Move(T_Temp(tl->head),pos), restore);
+		}
+		else{
+			restore = T_Move(T_Temp(tl->head), pos);
+		}
+	}
+
+	if(!view){
+		return T_Seq(save,T_Seq(stm, restore));
+	}
+	return T_Seq(save,T_Seq(view, T_Seq(stm, restore)));
+}
+AS_instrList F_procEntryExit2(AS_instrList body){
+	static Temp_tempList returnSink = NULL ;
+	if (!returnSink)  
+		returnSink = Temp_TempList(F_SP(), F_calleeSave());
+    return AS_splice(body,AS_InstrList(AS_Oper("ret", NULL, returnSink, NULL), NULL));
+
+}
+AS_proc F_procEntryExit3(F_frame frame, AS_instrList body){
+	int size = frame->size;
+	string fn =  S_name(F_name(frame));
+	char target[100];
+	char length[20];
+	sprintf(target, "%s_framesize", fn);
+	sprintf(length, "%d", F_wordsize*size);
+	AS_rewriteFrameSize(body, target, length);
+
+	return AS_Proc("", body, "");
+}
 

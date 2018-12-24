@@ -1,5 +1,5 @@
-#ifndef HELPER_H_
-#define HELPER_H_
+#ifndef _HELPER_H_
+#define _HELPER_H_
 
 
 //a: A_exp
@@ -43,6 +43,7 @@
 #define get_forexp_lo(a)  (a->u.forr.lo)
 #define get_forexp_hi(a)  (a->u.forr.hi)
 #define get_forexp_body(a)  (a->u.forr.body)
+#define get_forexp_esc(a)  (a->u.forr.escape)
 
 //arrayexp
 #define get_arrayexp_typ(a) (a->u.array.typ)
@@ -53,6 +54,7 @@
 #define get_vardec_init(a) (a->u.var.init)
 #define get_vardec_var(a)  (a->u.var.var)
 #define get_vardec_typ(a)  (a->u.var.typ)
+#define get_vardec_esc(a)  (a->u.var.escape)
 
 #define get_typedec_list(a) (a->u.type)
 #define get_funcdec_list(a) (a->u.function)
@@ -86,10 +88,12 @@
 #define get_func_tylist(x) (x->u.fun.formals)
 
 //------------------ lab5 ----------------------
-#define get_var_access(x) (x->u.var.access)
+#define get_varentry_access(x) (x->u.var.access)
 #define get_func_label(x) (x->u.fun.label)
 #define get_func_level(x) (x->u.fun.level)
 
-
+//s:T_stm
+#define get_cjump_true(s) (s->u.CJUMP.true)
+#define get_cjump_false(s) (s->u.CJUMP.false)
 
 #endif

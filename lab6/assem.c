@@ -13,7 +13,11 @@
 #include "tree.h"
 #include "assem.h"
 #include "frame.h"
+#include "graph.h"
+#include "table.h"
 #include "errormsg.h"
+#include "liveness.h"
+
 
 AS_targets AS_Targets(Temp_labelList labels) {
    AS_targets p = checked_malloc (sizeof *p);
@@ -91,30 +95,36 @@ static void format(char *result, string assem,
   for(p = assem; p && *p != '\0'; p++){
     if (*p == '`') {
       switch(*(++p)) {
-      case 's': {int n = atoi(++p);
-		 string s = Temp_look(m, nthTemp(src,n));
-		 strcpy(result+i, s);
-		 i += strlen(s);
-	       }
-	break;
-      case 'd': {int n = atoi(++p);
-		 string s = Temp_look(m, nthTemp(dst,n));
-		 strcpy(result+i, s);
-		 i += strlen(s);
-	       }
-	break;
-      case 'j': assert(jumps); 
-	       {int n = atoi(++p);
-		 string s = Temp_labelstring(nthLabel(jumps->labels,n));
-		 strcpy(result+i, s);
-		 i += strlen(s);
-	       }
-	break;
-      case '`': result[i] = '`'; i++; 
-	break;
-      default: assert(0);
-      }}
-    else {result[i] = *p; i++; }}
+        case 's': {
+          int n = atoi(++p);
+          string s = Temp_look(m, nthTemp(src,n));
+          //printf("test reg:%s\n",s);
+          strcpy(result+i, s);
+          i += strlen(s);
+        }
+        break;
+        case 'd': {
+          int n = atoi(++p);
+          string s = Temp_look(m, nthTemp(dst,n));
+          strcpy(result+i, s);
+          i += strlen(s);
+        }
+        break;
+        case 'j': assert(jumps); 
+        {
+          int n = atoi(++p);
+          string s = Temp_labelstring(nthLabel(jumps->labels,n));
+          strcpy(result+i,s);
+          i += strlen(s);
+        }
+        break;
+        case '`': result[i] = '`'; i++; 
+        break;
+        default: assert(0);
+      }
+    }
+    else {result[i] = *p; i++; }
+  }
   result[i] = '\0';
 }
 
@@ -162,4 +172,128 @@ AS_proc AS_Proc(string p, AS_instrList b, string e)
 {AS_proc proc = checked_malloc(sizeof(*proc));
  proc->prolog=p; proc->body=b; proc->epilog=e;
  return proc;
+}
+
+
+//my part
+void AS_rewrite(AS_instrList iList, Temp_map m){
+  AS_instrList p = iList;
+  AS_instrList last = NULL;
+  for(;p;p=p->tail){
+    AS_instr ins = p->head;
+    if(ins->kind == I_MOVE){
+        Temp_tempList dst = ins->u.MOVE.dst;
+				Temp_tempList src = ins->u.MOVE.src;
+				string ass = ins->u.MOVE.assem;				
+				if(strstr(ass,"movq `s0, `d0")){
+          string s = Temp_look(m, src->head);
+          string d = Temp_look(m, dst->head);
+					if(!strcmp(s,d)){
+            assert(last);
+            last->tail = p->tail;  
+            continue;          
+          }          
+				}
+    }
+    last = p;
+  }
+}
+
+char *strrpc(char *str,char *oldstr,char *newstr){
+    char bstr[strlen(str)];//转换缓冲区
+    memset(bstr,0,sizeof(bstr));
+ 
+    for(int i = 0;i < strlen(str);i++){
+        if(!strncmp(str+i,oldstr,strlen(oldstr))){//查找目标字符串
+            strcat(bstr,newstr);
+            i += strlen(oldstr) - 1;
+        }else{
+        	strncat(bstr,str + i,1);//保存一字节进缓冲区
+	    }
+    }
+ 
+    strcpy(str,bstr);
+    return str;
+}
+
+void AS_rewriteFrameSize(AS_instrList iList, string target, string len){
+  AS_instrList p = iList;
+  AS_instrList last = NULL;
+  for(;p;p=p->tail){
+    AS_instr ins = p->head;
+    string ass = ins->u.MOVE.assem;
+    if(strstr(ass, target)){
+      char *n = strrpc(ass, target, len);
+      //printf("after rpl:%s\n", n);
+      ins->u.MOVE.assem = String(n);
+    }    
+  }
+}
+
+AS_instrList AS_rewriteSpill(F_frame f, AS_instrList il, G_nodeList spills){
+  TAB_table tab = TAB_empty();
+  Temp_tempList targets = NULL;
+  int cnt = 0;
+  for(G_nodeList nl=spills;nl;nl=nl->tail){
+    cnt += 1;
+    Temp_temp t = Live_gtemp(nl->head);
+    targets = Temp_TempList(t, targets);
+    TAB_enter(tab, t, F_allocLocal(f, TRUE));
+  }
+  int flen = F_size(f) * F_wordsize;
+  AS_instrList newil = NULL;
+  for(AS_instrList p=il;p;p=p->tail){
+    AS_instr ins = p->head;
+    switch(ins->kind){
+      case I_LABEL:{
+        newil = AS_splice(newil, AS_InstrList(ins,NULL));
+        break;
+      }
+      case I_MOVE:
+      case I_OPER:{
+        Temp_tempList dst = ins->u.OPER.dst;
+        Temp_tempList src = ins->u.OPER.src;
+        
+        AS_instrList load = NULL;
+        for(Temp_tempList p=src;p;p=p->tail){
+          Temp_temp t = p->head;
+          if(Temp_inList(targets, t)){
+            Temp_temp n = Temp_newtemp();
+            Temp_replace(t, n, src);
+            F_access pos = TAB_look(tab, t);
+            int off = F_getFrameOff(pos);
+            char mov[100];
+            sprintf(mov, "movq %d(`s0), `d0",flen+off);
+            AS_instr i = AS_Move(String(mov),Temp_TempList(n,NULL),Temp_TempList(F_SP(),NULL));
+            load = AS_InstrList(i, load);         
+          }
+        }
+
+        AS_instrList store = NULL;
+        for(Temp_tempList p=dst;p;p=p->tail){
+          Temp_temp t = p->head;
+          if(Temp_inList(targets, t)){
+            Temp_temp n = Temp_newtemp();
+            Temp_replace(t, n, dst);
+            F_access pos = TAB_look(tab, t);
+            int off = F_getFrameOff(pos);
+            char mov[100];
+            sprintf(mov, "movq `s0, %d(`s1)",flen+off);
+            AS_instr i = AS_Move(String(mov),NULL,Temp_TempList(n,Temp_TempList(F_SP(),NULL)));
+            store = AS_InstrList(i, store);         
+          }
+        }
+        AS_instrList ff;
+        if(load) ff = AS_splice(load,AS_InstrList(ins, store));
+        else  ff = AS_InstrList(ins, store);
+
+        newil = AS_splice(newil, ff);
+        break;
+      }
+      default:assert(0);
+    }
+    
+  }
+  return newil;
+
 }

@@ -23,7 +23,7 @@ let
 		end
     
     function try() = 
-    (
+    ( 
     	init();
 	printi(bsearch(0,N-1,7)); /*expect: 3*/
 	print("\n")

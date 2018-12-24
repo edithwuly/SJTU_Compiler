@@ -6,17 +6,21 @@
 #ifndef ASSEM_H
 #define ASSEM_H
 
+#include "graph.h"
+
 typedef struct {Temp_labelList labels;} *AS_targets;
 AS_targets AS_Targets(Temp_labelList labels);
 
 typedef struct AS_instr_ *AS_instr;
-struct AS_instr_ { enum {I_OPER, I_LABEL, I_MOVE} kind;
-	       union {struct {string assem; Temp_tempList dst, src; 
+struct AS_instr_ { 
+	enum {I_OPER, I_LABEL, I_MOVE} kind;
+	union {
+		struct {string assem; Temp_tempList dst, src; 
 			      AS_targets jumps;} OPER;
-		      struct {string assem; Temp_label label;} LABEL;
-		      struct {string assem; Temp_tempList dst, src;} MOVE;
-		    } u;
-	      };
+		struct {string assem; Temp_label label;} LABEL;
+		struct {string assem; Temp_tempList dst, src;} MOVE;
+	} u;
+};
 
 AS_instr AS_Oper(string a, Temp_tempList d, Temp_tempList s, AS_targets j);
 AS_instr AS_Label(string a, Temp_label label);
@@ -42,8 +46,9 @@ AS_proc AS_Proc(string p, AS_instrList b, string e);
 
 
 //TA's implementation. Just for reference.
-//void AS_rewrite(AS_instrList iList, Temp_map m);
-//typedef struct F_frame_ *F_frame;
-//AS_instrList AS_rewriteSpill(F_frame f, AS_instrList il, Temp_tempList spills);
+void AS_rewrite(AS_instrList iList, Temp_map m);
+void AS_rewriteFrameSize(AS_instrList iList, string target, string len);
+typedef struct F_frame_ *F_frame;
+AS_instrList AS_rewriteSpill(F_frame f, AS_instrList il, G_nodeList spills);
 
 #endif

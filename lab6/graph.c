@@ -28,7 +28,8 @@ struct G_node_ {
 };
 
 G_graph G_Graph(void)
-{G_graph g = (G_graph) checked_malloc(sizeof *g);
+{
+  G_graph g = (G_graph) checked_malloc(sizeof *g);
  g->nodecount = 0;
  g->mynodes = NULL;
  g->mylast = NULL;
@@ -44,7 +45,8 @@ G_nodeList G_NodeList(G_node head, G_nodeList tail)
 
 /* generic creation of G_node */
 G_node G_Node(G_graph g, void *info)
-{G_node n = (G_node)checked_malloc(sizeof *n);
+{
+  G_node n = (G_node)checked_malloc(sizeof *n);
  G_nodeList p = G_NodeList(n, NULL);
  assert(g);
  n->mygraph=g;
@@ -105,7 +107,7 @@ void G_show(FILE *out, G_nodeList p, void showInfo(void *)) {
     if (showInfo) 
       showInfo(n->info);
     fprintf(out, " (%d): ", n->mykey); 
-    for(q=G_succ(n); q!=NULL; q=q->tail) 
+    for(q=G_adj(n); q!=NULL; q=q->tail) 
            fprintf(out, "%d ", q->head->mykey);
     fprintf(out, "\n");
   }

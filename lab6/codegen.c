@@ -11,332 +11,303 @@
 #include "codegen.h"
 #include "table.h"
 
-//Lab 6: put your code here
-
 #define BUFSIZE 40
 
-static AS_instrList iList=NULL, last=NULL;
-static void munchStm(T_stm s);
-static Temp_temp munchExp(T_exp e);
-static void munchArgs(T_expList args);
+//Lab 6: put your code here
+static AS_instrList asList, Last;
+static void emit(AS_instr inst);
+static void munchStm(T_stm stm);
+static Temp_temp munchExp(T_exp exp);
+static Temp_tempList munchArgs(int cnt, T_expList args);
+static Temp_tempList L(Temp_temp h, Temp_tempList t);
 
-static void emit(AS_instr inst){
-	if (last != NULL)
-	    last = last->tail = AS_InstrList(inst,NULL);
-	else
-	    last = iList = AS_InstrList(inst,NULL);
+static string fsStr = NULL;
+
+static Temp_tempList L(Temp_temp h, Temp_tempList t) {
+  	return Temp_TempList(h, t);
 }
 
-Temp_tempList L(Temp_temp h, Temp_tempList t){
-	return Temp_TempList(h,t);
+static void emit(AS_instr inst) {
+    	if(!Last)
+            asList = Last = AS_InstrList(inst, NULL);
+    	else
+            Last = Last->tail = AS_InstrList(inst, NULL);
 }
 
-static void munchArgs(T_expList args) {
-  	T_expList rargs = NULL;
-  	for(; args; args = args->tail)
-    	    rargs = T_ExpList(args->head, rargs);
-
-  	for(int i=0; rargs; rargs = rargs->tail, i++)
+static void munchStm(T_stm stm){
+    	switch(stm->kind)
 	{
-	    switch (i)
+            case T_LABEL:
 	    {
-		case 0:
+            	Temp_label LABEL = stm->u.LABEL;
+            	emit(AS_Label(Temp_labelstring(LABEL), LABEL));
+            	return;
+            }
+            case T_JUMP:
+	    {
+                T_exp expp = stm->u.JUMP.exp; 
+                Temp_labelList jumps = stm->u.JUMP.jumps;
+                emit(AS_Oper("jmp `j0", NULL, NULL, AS_Targets(jumps)));
+                return;
+            }
+            case T_CJUMP:
+	    {
+            	T_relOp op = stm->u.CJUMP.op;            
+		Temp_label t = stm->u.CJUMP.true;
+            	Temp_temp left = munchExp(stm->u.CJUMP.left);
+            	Temp_temp right = munchExp(stm->u.CJUMP.right);
+                emit(AS_Oper("cmpq `s0, `s1", NULL, L(right, L(left, NULL)),NULL));
+                string jstr;
+                switch(op)
 		{
-		    Temp_temp r = Temp_newtemp();
-		    emit(AS_Move("movq `s0, `d0", L(r, NULL), L(F_RDI(), NULL)));
-		    emit(AS_Move("movq `s0, `d0", L(F_RDI(), NULL), L(munchExp(rargs->head), NULL)));
-		    break;
-		}
-		case 1:
+                    case T_eq:
+			jstr="je `j0";
+			break;
+                    case T_ne:
+			jstr="jne `j0";
+			break;
+                    case T_lt:
+			jstr="jl `j0";
+			break;
+                    case T_gt:
+			jstr="jg `j0";
+			break;
+                    case T_le:
+			jstr="jle `j0";
+			break;
+                    case T_ge:
+			jstr="jge `j0";
+			break;
+		    case T_ult:
+			jstr="jb `j0";
+			break;
+                    case T_ule:
+			jstr="jbe `j0";
+			break;
+                    case T_ugt:
+			jstr="ja `j0";
+			break;
+                    case T_uge:
+			jstr="jae `j0";
+			break;
+                }
+                emit(AS_Oper(jstr, NULL, NULL, AS_Targets(Temp_LabelList(t, NULL))));
+                return;
+            }
+            case T_EXP:
+            	munchExp(stm->u.EXP);
+            	return;
+            case T_MOVE:
+	    {
+                T_exp src = stm->u.MOVE.src;
+                T_exp dst = stm->u.MOVE.dst;
+                if(dst->kind == T_TEMP)
 		{
-		    Temp_temp r = Temp_newtemp();
-		    emit(AS_Move("movq `s0, `d0", L(r, NULL), L(F_RSI(), NULL)));
-		    emit(AS_Move("movq `s0, `d0", L(F_RSI(), NULL), L(munchExp(rargs->head), NULL)));
-		    break;
-		}
-		case 2:
+                    emit(AS_Move("movq `s0, `d0", L(munchExp(dst),NULL), L(munchExp(src),NULL)));
+                    return;
+            	}
+            	if(dst->kind == T_MEM)
 		{
-		    Temp_temp r = Temp_newtemp();
-		    emit(AS_Move("movq `s0, `d0", L(r, NULL), L(F_RDX(), NULL)));
-		    emit(AS_Move("movq `s0, `d0", L(F_RDX(), NULL), L(munchExp(rargs->head), NULL)));
-		    break;
-		}
-		case 3:
-		{
-		    Temp_temp r = Temp_newtemp();
-		    emit(AS_Move("movq `s0, `d0", L(r, NULL), L(F_RCX(), NULL)));
-		    emit(AS_Move("movq `s0, `d0", L(F_RCX(), NULL), L(munchExp(rargs->head), NULL)));
-		    break;
-		}
-		case 4:
-		{
-		    Temp_temp r = Temp_newtemp();
-		    emit(AS_Move("movq `s0, `d0", L(r, NULL), L(F_R8(), NULL)));
-		    emit(AS_Move("movq `s0, `d0", L(F_R8(), NULL), L(munchExp(rargs->head), NULL)));
-		    break;
-		}
-		case 5:
-		{
-		    Temp_temp r = Temp_newtemp();
-		    emit(AS_Move("movq `s0, `d0", L(r, NULL), L(F_R9(), NULL)));
-		    emit(AS_Move("movq `s0, `d0", L(F_R9(), NULL), L(munchExp(rargs->head), NULL)));
-		    break;
-		}
-		default:
-		    emit(AS_Oper("push `s0", NULL, L(munchExp(rargs->head), NULL), NULL));
-	    }
-	}
+                    if(dst->u.MEM->kind == T_TEMP || dst->u.MEM->kind == T_CONST)
+		    {
+                    	emit(AS_Move("movq `s0, (`s1)", NULL,L(munchExp(src),L(munchExp(dst->u.MEM),NULL))));
+                    	return;
+                    }          
+                    if(dst->u.MEM->kind == T_BINOP)
+		    {
+                    	T_exp left = dst->u.MEM->u.BINOP.left;
+                    	T_exp right = dst->u.MEM->u.BINOP.right;
+                    	if(right->kind != T_CONST && right->kind != T_TEMP && left->kind != T_CONST && left->kind != T_TEMP)
+			{
+                            emit(AS_Move("movq `s0, (`s1)", NULL ,L(munchExp(src),L(munchExp(dst->u.MEM),NULL))));
+                            return;
+                        }
+                    	if(left->kind == T_TEMP && right->kind == T_CONST)
+			{
+			    char *a = checked_malloc(BUFSIZE * sizeof(char));
+            		    sprintf(a,"movq `s0, %d(`s1)", right->u.CONST);
+            		    emit(AS_Move(a, NULL, L(munchExp(src),L(munchExp(left),NULL))));
+                            return;
+                    	}
+                    	if(right->kind == T_TEMP && left->kind == T_CONST)
+			{
+			    char *a = checked_malloc(BUFSIZE * sizeof(char));
+            		    sprintf(a,"movq `s0, %d(`s1)", left->u.CONST);
+            		    emit(AS_Move(a, NULL, L(munchExp(src),L(munchExp(right),NULL))));
+                            return;
+                    	}
+                    }
+            	}
+            	return;
+            }
+	    
+    	}
 }
 
-static Temp_temp munchExp(T_exp e) {
-	switch(e->kind) 
+static Temp_temp munchExp(T_exp e){
+    	switch(e->kind)
+	{        
+            case T_BINOP:
+	    { 
+            	T_binOp op = e->u.BINOP.op;
+            	Temp_temp left = munchExp(e->u.BINOP.left);
+            	Temp_temp right = munchExp(e->u.BINOP.right);
+            	string opstr;
+            	switch(op)
+		{
+               	    case T_plus:
+			opstr = "addq `s1, `d0";
+			break;
+               	    case T_minus:
+			opstr = "subq `s1, `d0";
+			break;
+               	    case T_mul:
+			opstr = "imulq `s1, `d0";
+			break;
+               	    case T_div:
+		    {
+                   	emit(AS_Move("movq `s0, `d0",L(F_RAX(),NULL),L(left,NULL)));
+			emit(AS_Oper("cqto",L(F_RAX(),L(F_RDX(), NULL)),NULL,NULL));
+			emit(AS_Oper("idivq `s0", L(F_RAX(),L(F_RDX(), NULL)), L(right,NULL), NULL));
+			return F_RAX();
+               	    } 
+            	}
+
+            	if(e->u.BINOP.left->kind == T_TEMP)
+		{
+                    Temp_temp n = Temp_newtemp();
+                    emit(AS_Move("movq `s0, `d0", L(n,NULL), L(left,NULL)));
+                    emit(AS_Oper(opstr, L(n, NULL),L(n, L(right,NULL)), NULL));
+                    return n;
+            	}
+            
+            	emit(AS_Oper(opstr, L(left, NULL),L(left, L(right,NULL)), NULL));
+            	return left;
+            }
+	    case T_MEM:
+	    {
+            	T_exp MEM = e->u.MEM;
+            	Temp_temp dst = Temp_newtemp();
+            	if(MEM->kind == T_TEMP)
+		{
+                    emit(AS_Move("movq (`s0), `d0", L(dst,NULL),L(MEM->u.TEMP,NULL)));
+                    return dst;
+            	}     
+            	if(MEM->kind == T_CONST)
+		{
+                    emit(AS_Move("movq (`s0), `d0", L(dst,NULL),L(munchExp(MEM),NULL)));
+                    return dst;
+            	}       
+            	if(MEM->kind == T_BINOP)
+		{
+                    T_exp left = MEM->u.BINOP.left, right = MEM->u.BINOP.right;
+                    if(right->kind != T_CONST && right->kind != T_TEMP && left->kind != T_CONST && left->kind != T_TEMP)
+		    {
+                    	emit(AS_Move("movq (`s0), `d0", L(dst,NULL),L(munchExp(MEM),NULL)));
+                    	return dst;
+                    }
+                    if(left->kind == T_TEMP && right->kind == T_CONST)
+		    {
+			char *a = checked_malloc(BUFSIZE * sizeof(char));
+            		sprintf(a,"movq %d(`s0), `d0", right->u.CONST);
+            		emit(AS_Move(a, L(dst,NULL), L(munchExp(left),NULL)));
+                        return dst;
+                    }
+                    if(right->kind != T_CONST && right->kind != T_TEMP || right->kind == T_TEMP && left->kind == T_CONST)
+		    {
+			char *a = checked_malloc(BUFSIZE * sizeof(char));
+            		sprintf(a,"movq %d(`s0), `d0", left->u.CONST);
+            		emit(AS_Move(a, L(dst,NULL), L(munchExp(right),NULL)));
+                        return dst;
+                    }
+            	}
+            }
+            case T_TEMP:
+	    {
+            	Temp_temp t = e->u.TEMP;
+            	if (t == F_FP())
+		{
+                    t = Temp_newtemp();
+    		    char *a = checked_malloc(BUFSIZE * sizeof(char));
+    		    sprintf(a, "leaq %s(`s0), `d0", fsStr);
+    		    emit(AS_Move(a, L(t,NULL), L(F_SP(),NULL)));
+		}
+
+           	return t;
+            }
+            case T_NAME:
+	    {
+            	Temp_temp dst = Temp_newtemp();
+            	char *a = checked_malloc(BUFSIZE * sizeof(char));
+            	sprintf(a,"leaq %s, `d0", Temp_labelstring(e->u.NAME));
+            	emit(AS_Oper(a, L(dst, NULL), NULL, NULL));
+            	return dst;
+            }
+	    case T_CONST:
+	    {
+            	Temp_temp dst = Temp_newtemp();
+            	char *a = checked_malloc(BUFSIZE * sizeof(char));
+            	sprintf(a, "movq $%d, `d0", e->u.CONST);
+            	emit(AS_Move(a, L(dst,NULL), NULL));
+            	return dst;
+            }
+            case T_CALL:
+	    {
+            	Temp_tempList regs = munchArgs(0, e->u.CALL.args);
+
+            	char *a = checked_malloc(BUFSIZE * sizeof(char));
+            	sprintf(a, "call %s", Temp_labelstring(e->u.CALL.fun->u.NAME));
+            	emit(AS_Oper(a, L(F_RAX(), F_callerSave()), regs, NULL));
+            	return F_RAX();
+            }
+    	}
+}
+
+static Temp_tempList munchArgs(int cnt, T_expList args){
+    	if(!args)
+            return NULL;
+    
+    	T_exp arg = args->head;
+    	Temp_temp src = munchExp(arg);
+    	if(cnt < 6)
 	{
-	    case T_MEM: 
-	    {
-      		Temp_temp r = Temp_newtemp();
-      		emit(AS_Oper("movq (`s0), `d0", L(r, NULL), L(munchExp(e->u.MEM), NULL), NULL));
-      		return r;
-    	    }
-    	    case T_BINOP: 
-	    {
-      		Temp_temp left = munchExp(e->u.BINOP.left), right = munchExp(e->u.BINOP.right);
-      		Temp_temp r = Temp_newtemp();
-      		switch(e->u.BINOP.op) 
-		{
-		    case T_plus:
-          	    	emit(AS_Oper("addq `s0, `d0", L(left, NULL), L(right, L(left, NULL)), NULL));
-          	    	return r;
-        	    case T_minus:
-          		emit(AS_Oper("subq `s0, `d0", L(left, NULL), L(right, L(left, NULL)), NULL));
-          		return r;
-       	 	    case T_mul:
-          		emit(AS_Oper("imulq `s0, `d0", L(left, NULL), L(right, L(left, NULL)), NULL));
-          		return r;
-        	    case T_div: 
-          		emit(AS_Move("movq `s0, `d0", L(F_RAX(), NULL), L(left, NULL)));
-          		emit(AS_Oper("cltd", L(F_RDX(), L(F_RAX(), NULL)), L(F_RAX(), NULL), NULL));
-          		emit(AS_Oper("idivq `s0", L(F_RDX(), L(F_RAX(), NULL)), L(right, L(F_RDX(), L(F_RAX(), NULL))), NULL));
-          		emit(AS_Move("movq `s0, `d0", L(r, NULL), L(F_RAX(), NULL)));
-          	        return r;
-        	    default:
-          	    	assert(0);
-      		}
-    	    }
-    	    case T_TEMP:
-      		return e->u.TEMP;
-    	    case T_NAME: 
-	    {
-      		Temp_temp r = Temp_newtemp();
-      		char *a = checked_malloc(BUFSIZE * sizeof(char));
-      		sprintf(a, "movq $%s, `d0", Temp_labelstring(e->u.NAME));
-      		emit(AS_Oper(a, L(r, NULL), NULL, NULL));
-      		return r;
-    	    }
-    	    case T_CONST: 
-	    {
-      		Temp_temp r = Temp_newtemp();
-      		char *a = checked_malloc(BUFSIZE * sizeof(char));
-      		sprintf(a, "movq $%d, `d0", e->u.CONST);
-      		emit(AS_Oper(a, L(r, NULL), NULL, NULL));
-      		return r;
-    	    }
-    	    case T_CALL: 
-	    {
-      		if(e->u.CALL.fun->kind == T_NAME) 
-		{
-        	    Temp_temp r = Temp_newtemp();
-        	    munchArgs(e->u.CALL.args);
-        	    char *a = checked_malloc(BUFSIZE * sizeof(char));
-        	    sprintf(a, "call %s", Temp_labelstring(e->u.CALL.fun->u.NAME));
-        	    emit(AS_Oper(a, F_callersaves(), NULL, NULL));
-
-        	    int offset = 0;
-        	    for(T_expList args = e->u.CALL.args; args; args = args->tail)
-          		offset ++;
-
-        	    if(offset > 6) 
-		    {
-          		a = checked_malloc(BUFSIZE * sizeof(char));
-          		sprintf(a, "addq $%d, %%rsp", (offset - 6) * F_wordSize);
-          		emit(AS_Oper(a, NULL, NULL, NULL));
-        	    }
-
-        	    emit(AS_Move("movq `s0, `d0", L(r, NULL), L(F_RV(), NULL)));
-        	    return r;
-      		}
-		else
-        	    assert(0);
-    	    }
-    	    case T_ESEQ: 
-	    {
-      		munchStm(e->u.ESEQ.stm);
-      		return munchExp(e->u.ESEQ.exp);
-    	    }
-   	    default:
-      		assert(0);
-  	}
-}
-
-static void munchStm(T_stm s){
-	switch(s->kind)
+            Temp_temp dst = F_ARG(cnt);
+            Temp_tempList tl = Temp_TempList(dst, munchArgs(cnt+1, args->tail));
+            emit(AS_Move("movq `s0, `d0", L(dst,NULL),L(src,NULL)));
+            return tl;
+    	}
+    	else
 	{
-	    case T_MOVE:
-	    {
-		T_exp dst = s->u.MOVE.dst, src = s->u.MOVE.src;
-		if (dst->kind == T_MEM)
-		{
-		    if (dst->u.MEM->kind == T_BINOP && dst->u.BINOP.op == T_plus && dst->u.MEM->u.BINOP.right->kind == T_CONST)
-		    {
-			T_exp e1 = dst->u.MEM->u.BINOP.left, e2 = src;
-            		int n = dst->u.MEM->u.BINOP.right->u.CONST;
-            		char *a = checked_malloc(BUFSIZE * sizeof(char));
-            		sprintf(a, "movq `s0, %d(`s1)", n);
-            		emit(AS_Oper(a, NULL, L(munchExp(e2), L(munchExp(e1), NULL)), NULL));
-		    }
-		    else if (dst->u.MEM->kind == T_BINOP && dst->u.BINOP.op == T_plus && dst->u.MEM->u.BINOP.left->kind == T_CONST)
-		    {
-			T_exp e1 = dst->u.MEM->u.BINOP.left, e2 = src;
-            		int n = dst->u.MEM->u.BINOP.left->u.CONST;
-            		char *a = checked_malloc(BUFSIZE * sizeof(char));
-            		sprintf(a, "movq `s0, %d(`s1)", n);
-            		emit(AS_Oper(a, NULL, L(munchExp(e2), L(munchExp(e1), NULL)), NULL));
-		    }
-		    else
-		    {
-			T_exp e1 = dst->u.MEM, e2 = src;
-          		emit(AS_Oper("movl `s0, (`s1)", NULL, L(munchExp(e2), L(munchExp(e1), NULL)), NULL));
-		    }
-		}
-		else if (dst->kind == T_TEMP)
-		{
-		    if(src->kind == T_CONST) 
-		    {
-          	    	char *a = checked_malloc(BUFSIZE * sizeof(char));
-          		sprintf(a, "movq $%d, `d0", src->u.CONST);
-          		emit(AS_Oper(a, L(munchExp(dst), NULL), NULL, NULL));
-        	    }
-        	    else if(src->kind == T_NAME) 
-		    {
-          		char *a = checked_malloc(BUFSIZE * sizeof(char));
-          		sprintf(a, "movq $%s, `d0", Temp_labelstring(src->u.NAME));
-          		emit(AS_Oper(a, L(munchExp(dst), NULL), NULL, NULL));
-        	    }
-        	    else 
-          		emit(AS_Move("movq `s0, `d0", L(munchExp(dst), NULL), L(munchExp(src), NULL)));
-		}
-		else
-		    assert(0);
-		break;
-	    }
-	    case T_JUMP: 
-	    {
-      		T_exp e = s->u.JUMP.exp;
-      		if(e->kind == T_NAME) 
-		{
-        	    char *a = checked_malloc(BUFSIZE * sizeof(char));
-        	    sprintf(a, "jmp %s", Temp_labelstring(e->u.NAME));
-        	    emit(AS_Oper(a, NULL, NULL, AS_Targets(s->u.JUMP.jumps)));
-      		}
-		else
-        	    assert(0);
-      		break;
-    	    }
-    	    case T_CJUMP: 
-	    {
-      		string funcode;
-      		Temp_temp left = munchExp(s->u.CJUMP.left);
-      		Temp_temp right = munchExp(s->u.CJUMP.right);
-      		switch(s->u.CJUMP.op)
-		{
-        	    case T_eq:
-          	    	funcode = "je";
-          	    	break;
-       		    case T_ne:
-          		funcode = "jne";
-          		break;
-        	    case T_lt:
-          		funcode = "jl";
-          		break;
-        	    case T_gt:
-          		funcode = "jg";
-          		break;
-        	    case T_le:
-          		funcode = "jle";
-          		break;
-        	    case T_ge:
-          		funcode = "jge";
-          		break;
-        	    default:
-          		assert(0);
-      		}
-      		emit(AS_Oper("cmp `s0, `s1", NULL, L(right, L(left, NULL)), NULL));
-      		char *a = checked_malloc(BUFSIZE * sizeof(char));
-      		sprintf(a, "%s `j0",funcode);
-      		emit(AS_Oper(a, NULL, NULL, AS_Targets(Temp_LabelList(s->u.CJUMP.true, NULL))));
-      	    	break;
-    	    }
-    	    case T_EXP:
-      	    	munchExp(s->u.EXP);
-      		break;
-    	    case T_LABEL: 
-	    {
-      		char *a = checked_malloc(BUFSIZE * sizeof(char));
-      		sprintf(a, "%s", Temp_labelstring(s->u.LABEL));
-      		emit(AS_Label(a, s->u.LABEL));
-      		break;
-    	    }
-    	    case T_SEQ:
-      		munchStm(s->u.SEQ.left);
-      		munchStm(s->u.SEQ.right);
-      		break;
-    	    default:
-      		assert(0);
-	}
+            munchArgs(cnt+1, args->tail);
+            char *a = checked_malloc(BUFSIZE * sizeof(char));
+            sprintf(a, "movq `s0, %d(`s1)", (cnt-6)*F_wordsize);
+            emit(AS_Move(a, NULL, L(src,L(F_RSP(),NULL))));
+            return NULL;
+    	}
 }
+
 
 AS_instrList F_codegen(F_frame f, T_stmList stmList) {
-	AS_instrList list;
+    	asList = NULL;
+    	Last = NULL; 
 
-	Temp_enter(F_tempMap, F_RAX(), "%rax");
- 	Temp_enter(F_tempMap, F_RBX(), "%rbx");
- 	Temp_enter(F_tempMap, F_RCX(), "%rcx");
- 	Temp_enter(F_tempMap, F_RDX(), "%rdx");
- 	Temp_enter(F_tempMap, F_RSI(), "%rsi");
- 	Temp_enter(F_tempMap, F_RDI(), "%rdi");
- 	Temp_enter(F_tempMap, F_RSP(), "%rsp");
- 	Temp_enter(F_tempMap, F_RBP(), "%rbp");
- 	Temp_enter(F_tempMap, F_R8(), "%r8");
- 	Temp_enter(F_tempMap, F_R9(), "%r9");
- 	Temp_enter(F_tempMap, F_R10(), "%r10");
- 	Temp_enter(F_tempMap, F_R11(), "%r11");
- 	Temp_enter(F_tempMap, F_R12(), "%r12");
- 	Temp_enter(F_tempMap, F_R13(), "%r13");
- 	Temp_enter(F_tempMap, F_R14(), "%r14");
- 	Temp_enter(F_tempMap, F_R15(), "%r15");
+    	char *a = checked_malloc(BUFSIZE * sizeof(char));
+    	sprintf(a, "%s_framesize", Temp_labelstring(F_name(f)));
+    	fsStr = a;
 
-	Temp_temp saved_rbx = Temp_newtemp();
-  	Temp_temp saved_r12 = Temp_newtemp();
-  	Temp_temp saved_r13 = Temp_newtemp();
-	Temp_temp saved_r14 = Temp_newtemp();
-	Temp_temp saved_r15 = Temp_newtemp();
+    	char *begin = checked_malloc(BUFSIZE * sizeof(char));
+    	sprintf(begin, "subq $%s, `d0", fsStr);
+    	emit(AS_Oper(begin, L(F_RSP(),NULL), L(F_RSP(),NULL), NULL));
 
-	emit(AS_Move("movq `s0, `d0", L(saved_rbx, NULL), L(F_RBX(), NULL)));
-  	emit(AS_Move("movq `s0, `d0", L(saved_r12, NULL), L(F_R12(), NULL)));
-  	emit(AS_Move("movq `s0, `d0", L(saved_r13, NULL), L(F_R13(), NULL)));
-	emit(AS_Move("movq `s0, `d0", L(saved_r14, NULL), L(F_R14(), NULL)));
-	emit(AS_Move("movq `s0, `d0", L(saved_r15, NULL), L(F_R15(), NULL)));
+    	for (T_stmList sl=stmList; sl; sl = sl->tail){
+            T_stm stm = sl->head;
+            munchStm(stm);
+    	}  
 
-	for (T_stmList sl = stmList; sl; sl = sl->tail)
-    	    munchStm(sl->head);
+    	char *end = checked_malloc(BUFSIZE * sizeof(char));
+    	sprintf(end, "addq $%s, `d0", fsStr);
+    	emit(AS_Oper(end, L(F_RSP(),NULL), L(F_RSP(),NULL), NULL));
 
-	emit(AS_Move("movq `s0, `d0", L(F_RBX(), NULL), L(saved_rbx, NULL)));
-  	emit(AS_Move("movq `s0, `d0", L(F_R12(), NULL), L(saved_r12, NULL)));
-  	emit(AS_Move("movq `s0, `d0", L(F_R13(), NULL), L(saved_r13, NULL)));
-	emit(AS_Move("movq `s0, `d0", L(F_R14(), NULL), L(saved_r14, NULL)));
-	emit(AS_Move("movq `s0, `d0", L(F_R15(), NULL), L(saved_r15, NULL)));
-
-  	emit(AS_Oper("leave", NULL, L(F_RV(), F_calleesaves()), NULL));
-  	emit(AS_Oper("ret", NULL, L(F_RV(), F_calleesaves()), NULL));
-
-	return iList;
+    	return F_procEntryExit2(asList);
 }
+
