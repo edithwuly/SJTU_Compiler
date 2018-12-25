@@ -344,17 +344,6 @@ Temp_temp F_SP(void){
 Temp_temp F_RV(void){
 	return F_RAX();
 }
-Temp_temp F_ARG(int idx){
-	switch(idx){
-		case 0:return F_RDI();
-		case 1:return F_RSI();
-		case 2:return F_RDX();
-		case 3:return F_RCX();
-		case 4:return F_R8();
-		case 5:return F_R9();
-		default:assert(0);
-	}
-}
 
 static Temp_tempList args = NULL;
 Temp_tempList F_Args(){
@@ -435,24 +424,22 @@ T_stm F_procEntryExit1(F_frame f, T_stm stm){
 	T_stm view = NULL;
 	int cnt = 0;
 	T_exp fp = T_Temp(F_FP());
-	for(F_accessList l=f->formals;l;l=l->tail){
+	for(F_accessList l=f->formals;l;l=l->tail,cnt++){
 		F_access arg = l->head;
 		T_exp argpos = F_exp(arg,fp);
 		switch(cnt){
-			case 0:view=T_Move(argpos,T_Temp(F_ARG(cnt)));break;//rdi SL
-			case 1://rsi
-			case 2://rdx
-			case 3://rcx
-			case 4://r8
-			case 5:view = T_Seq(T_Move(argpos,T_Temp(F_ARG(cnt))),
-								view);break;//r9
-			default:{
-				int off = (cnt-6+1)*F_wordsize ;
-				view = T_Seq(
-						T_Move(argpos,T_Mem(T_Binop(T_plus, T_Const(off), fp))),view);
+			case 0:view=T_Move(argpos,T_Temp(F_RDI()));break;
+			case 1:view = T_Seq(T_Move(argpos,T_Temp(F_RSI())),view);break;
+			case 2:view = T_Seq(T_Move(argpos,T_Temp(F_RDX())),view);break;
+			case 3:view = T_Seq(T_Move(argpos,T_Temp(F_RCX())),view);break;
+			case 4:view = T_Seq(T_Move(argpos,T_Temp(F_R8())),view);break;
+			case 5:view = T_Seq(T_Move(argpos,T_Temp(F_R9())),view);break;
+			default:
+			{
+				int off = (cnt-6+1)*F_wordsize;
+				view = T_Seq(T_Move(argpos,T_Mem(T_Binop(T_plus, T_Const(off), fp))),view);
 			}
 		}
-		cnt += 1;
 	}
 
 	//callee save
@@ -488,6 +475,7 @@ T_stm F_procEntryExit1(F_frame f, T_stm stm){
 	}
 	return T_Seq(save,T_Seq(view, T_Seq(stm, restore)));
 }
+
 AS_instrList F_procEntryExit2(AS_instrList body){
 	static Temp_tempList returnSink = NULL ;
 	if (!returnSink)  
@@ -495,6 +483,7 @@ AS_instrList F_procEntryExit2(AS_instrList body){
     return AS_splice(body,AS_InstrList(AS_Oper("ret", NULL, returnSink, NULL), NULL));
 
 }
+
 AS_proc F_procEntryExit3(F_frame frame, AS_instrList body){
 	int size = frame->size;
 	string fn =  S_name(F_name(frame));

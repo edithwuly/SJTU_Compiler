@@ -268,22 +268,38 @@ static Temp_tempList munchArgs(int cnt, T_expList args){
             return NULL;
     
     	T_exp arg = args->head;
-    	Temp_temp src = munchExp(arg);
-    	if(cnt < 6)
+    	Temp_temp src = munchExp(arg), dst;
+
+	switch(cnt)
 	{
-            Temp_temp dst = F_ARG(cnt);
-            Temp_tempList tl = Temp_TempList(dst, munchArgs(cnt+1, args->tail));
-            emit(AS_Move("movq `s0, `d0", L(dst,NULL),L(src,NULL)));
-            return tl;
-    	}
-    	else
-	{
-            munchArgs(cnt+1, args->tail);
-            char *a = checked_malloc(BUFSIZE * sizeof(char));
-            sprintf(a, "movq `s0, %d(`s1)", (cnt-6)*F_wordsize);
-            emit(AS_Move(a, NULL, L(src,L(F_RSP(),NULL))));
-            return NULL;
-    	}
+	    case 0:
+		dst = F_RDI();
+            	break;
+	    case 1:
+		dst = F_RSI();
+            	break;
+	    case 2:
+		dst = F_RDX();
+            	break;
+	    case 3:
+		dst = F_RCX();
+            	break;
+	    case 4:
+		dst = F_R8();
+            	break;
+	    case 5:
+		dst = F_R9();
+            	break;
+	    default:
+		munchArgs(cnt+1, args->tail);
+            	char *a = checked_malloc(BUFSIZE * sizeof(char));
+            	sprintf(a, "movq `s0, %d(`s1)", (cnt-6)*F_wordsize);
+            	emit(AS_Move(a, NULL, L(src,L(F_RSP(),NULL))));
+            	return NULL;
+	}
+        Temp_tempList tl = Temp_TempList(dst, munchArgs(cnt+1, args->tail));
+        emit(AS_Move("movq `s0, `d0", L(dst,NULL),L(src,NULL)));
+        return tl;
 }
 
 

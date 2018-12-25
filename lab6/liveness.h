@@ -17,4 +17,8 @@ Temp_temp Live_gtemp(G_node n);
 
 struct Live_graph Live_liveness(G_graph flow);
 
+bool inMoveList(G_node node, Live_moveList list);
+Live_moveList RMrelatedMovs(G_node node, Live_moveList list);
+Live_moveList CatMovList(Live_moveList A, Live_moveList B);
+
 #endif

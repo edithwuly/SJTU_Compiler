@@ -44,7 +44,6 @@ Temp_temp F_R12(void);
 Temp_temp F_R13(void);
 Temp_temp F_R14(void);
 Temp_temp F_R15(void);
-Temp_temp F_ARG(int idx);
 
 Temp_tempList F_Args();
 Temp_tempList F_callerSave();
