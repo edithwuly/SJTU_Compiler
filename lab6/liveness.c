@@ -48,6 +48,28 @@ bool inMoveList(G_node node, Live_moveList list){
     return FALSE;
 }
 
+Live_moveList Live_remove(G_node src, G_node dst, Live_moveList l){
+    	Live_moveList last = NULL;
+    	for (Live_moveList p = l; p; p = p->tail)
+	{
+            if(p->dst == dst && p->src == src)
+	    {
+            	if(last)
+		{
+                    last->tail = p->tail;
+                    break;
+            	}
+            	else
+		{
+                    l = l->tail;
+                    break;
+            	}
+            }
+            last = p;
+    	}
+    	return l;
+}
+
 Live_moveList RMrelatedMovs(G_node node, Live_moveList list){
     Live_moveList li = NULL;
     Live_moveList last = NULL;

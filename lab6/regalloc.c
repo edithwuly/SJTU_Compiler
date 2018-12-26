@@ -33,38 +33,52 @@ static Live_moveList activeMoves;
 
 static G_table degree;
 static G_table alias;
-
+static Live_moveList moveList;
 static Temp_map color;
 
-static bool MoveRelated(G_node node){
-	return inMoveList(node, worklistMoves) || inMoveList(node, activeMoves);
+static Live_moveList NodeMoves(G_node n){
+	Live_moveList l = NULL;
+	for (Live_moveList rel = RMrelatedMovs(n, moveList); rel; rel=rel->tail)
+	    if((rel->src != n && inMoveList(rel->src, activeMoves)) || (rel->dst != n && inMoveList(rel->dst, worklistMoves)))	
+		l = Live_MoveList(rel->src, rel->dst, l);
+	return l;
+}
+
+static bool MoveRelated(G_node n){
+	return NodeMoves(n) != NULL;
 }
 
 static G_nodeList Adjacent(G_node node){
 	return G_minusNodeList(G_adj(node), G_unionNodeList(selectStack, coalescedNode));
 }
+
 static void EnableMoves(G_nodeList nodes){
-	for(;nodes;nodes=nodes->tail){
-		G_node node = nodes->head;
-		Live_moveList rel = RMrelatedMovs(node, activeMoves);
-		if(inMoveList(node, activeMoves))
-			activeMoves = activeMoves->tail;
-		
-		worklistMoves = CatMovList(worklistMoves, rel);
+	for(;nodes;nodes=nodes->tail)
+	{
+	    G_node n = nodes->head;
+	    for (Live_moveList rel = NodeMoves(n); rel; rel=rel->tail)
+	    {
+	    	if((rel->src != n && inMoveList(rel->src, activeMoves)) || (rel->dst != n && inMoveList(rel->dst, worklistMoves)))
+	    	{
+		    activeMoves = Live_remove(rel->src, rel->dst, activeMoves);	
+		    worklistMoves = Live_MoveList(rel->src, rel->dst, worklistMoves);
+	    	}
+	    }
 	}	
 }
-static void DecrementDegree(G_node node){
-	int *d = G_look(degree, node);
+
+static void DecrementDegree(G_node m){
+	int *d = G_look(degree, m);
 	(*d)--;
 	if(*d + 1 == REG_NUM)
 	{
-		EnableMoves(G_NodeList(node, Adjacent(node)));
-		spillWorkList = G_removeNode(node, spillWorkList);
-		if(MoveRelated(node))
-		    freezeWorkList=G_NodeList(node, freezeWorkList);
+	    EnableMoves(G_NodeList(m, Adjacent(m)));
+	    spillWorkList = G_removeNode(m, spillWorkList);
+	    if(MoveRelated(m))
+		freezeWorkList=G_NodeList(m, freezeWorkList);
 		
-		else
-		    simplifyWorkList=G_NodeList(node, simplifyWorkList);
+	    else
+		simplifyWorkList=G_NodeList(m, simplifyWorkList);
 		
 	}
 }
@@ -84,31 +98,25 @@ static void AddWorkList(G_node node){
 	}
 }
 static bool OK(G_node t, G_node r){
-	return (*(int *)G_look(degree, t) < REG_NUM || G_inNodeList(t,precolored) || G_inNodeList(t, G_adj(r)));
-}
-static bool Check(G_node u, G_node v){
-	if(G_inNodeList(u, precolored)){
-		bool pass = TRUE;
-		for(G_nodeList nl=Adjacent(v);nl;nl=nl->tail){
-			G_node t = nl->head;
-			if(!OK(t,u)){
-				pass = FALSE;
-				break;
-			}
-		}
-		if(pass) return TRUE;
+	for(G_nodeList nl=Adjacent(t);nl;nl=nl->tail)
+	{
+	    G_node node = nl->head;
+	    if (!((*(int *)G_look(degree, node) < REG_NUM || G_inNodeList(node,precolored) || G_inNodeList(node, G_adj(r)))))
+		return FALSE;
 	}
-	else{
-		G_nodeList nodes = G_unionNodeList(Adjacent(u),Adjacent(v));
-		int cnt = 0;
-		for(;nodes;nodes=nodes->tail){
-			G_node n = nodes->head;
-			if(*(int *)G_look(degree, n) >= REG_NUM) cnt += 1;
-		}
-		if(cnt < REG_NUM) return TRUE;
-	}
-	return FALSE;
+
+	return TRUE;
 }
+
+static bool Conservative(G_nodeList nodes){
+	int k = 0;
+	for(;nodes;nodes=nodes->tail)
+	    if(*(int *)G_look(degree, nodes->head) >= REG_NUM) 
+		k++;
+	
+	return k < REG_NUM;
+}
+
 static void Combine(G_node u, G_node v){
 	if(G_inNodeList(v, freezeWorkList))
 	    freezeWorkList = G_removeNode(v, freezeWorkList);
@@ -116,20 +124,57 @@ static void Combine(G_node u, G_node v){
 	    spillWorkList = G_removeNode(v, spillWorkList);
 
 	coalescedNode = G_NodeList(v, coalescedNode);
-
 	G_enter(alias, v, u);
 
-	EnableMoves(G_NodeList(v, NULL));
-	for(G_nodeList nl=Adjacent(v);nl;nl=nl->tail){
-		G_node t = nl->head;
-		if(G_goesTo(u, t) || u == t)continue;
-		G_addEdge(t, u);		
-		DecrementDegree(t);
+	for(G_nodeList nl=Adjacent(v);nl;nl=nl->tail)
+	{
+	    G_node t = nl->head;
+	    G_addEdge(t, u);		
+	    DecrementDegree(t);
 	}
-	if(*(int *)G_look(degree, u) >= REG_NUM && G_inNodeList(u, freezeWorkList)){
-		freezeWorkList = G_removeNode(u, freezeWorkList);
-		spillWorkList = G_NodeList(u, spillWorkList);
+	if(*(int *)G_look(degree, u) >= REG_NUM && G_inNodeList(u, freezeWorkList))
+	{
+	    freezeWorkList = G_removeNode(u, freezeWorkList);
+	    spillWorkList = G_NodeList(u, spillWorkList);
 	}	
+}
+
+static void Coalesce(){
+	G_node x = GetAlias(worklistMoves->src);
+	G_node y = GetAlias(worklistMoves->dst);
+	worklistMoves = worklistMoves->tail;
+
+	G_node u,v;
+	if (G_inNodeList(x, precolored))
+	{
+	    u = x;
+	    v = y;
+	}
+	else
+	{
+	    u = y;
+	    v = x;
+	}
+	
+	if(u == v)
+	{
+	    coalescedMoves = Live_MoveList(x, y, coalescedMoves);
+	    AddWorkList(u);
+	}
+	else if(G_inNodeList(v, precolored) || G_inNodeList(u, G_adj(v)))
+	{
+	    constrainedMoves = Live_MoveList(x, y, constrainedMoves);
+	    AddWorkList(u);
+	    AddWorkList(v);
+	}
+	else if(G_inNodeList(u, precolored) && OK(u,v) || !G_inNodeList(u, precolored) && Conservative(G_unionNodeList(Adjacent(u),Adjacent(v))))
+	{
+	    coalescedMoves = Live_MoveList(x, y, coalescedMoves);
+	    Combine(u, v);
+	    AddWorkList(u);
+	}
+	else
+	    activeMoves = Live_MoveList(x, y, activeMoves);
 }
 
 static void MakeWorkList(G_graph cfgraph){
@@ -168,60 +213,24 @@ static void Simplify(){
 	    DecrementDegree(nl->head);
 	
 }
-static void Coalesce(){
-	Live_moveList p = Live_MoveList(worklistMoves->src,worklistMoves->dst,NULL);
-	worklistMoves = worklistMoves->tail;
-	G_node src = GetAlias(p->src);
-	G_node dst = GetAlias(p->dst);
 
-	G_node u,v;
-	if (G_inNodeList(src, precolored)){
-		u = src; 
-		v = dst;
-	}
-	else{
-		u = dst; 
-		v = src;
-	}
-	
-	if(u == v){
-		coalescedMoves = Live_MoveList(p->src, p->dst, coalescedMoves);
-		AddWorkList(u);
-	}
-	else if(G_inNodeList(v, precolored) || G_inNodeList(u, G_adj(v))){
-		constrainedMoves = Live_MoveList(p->src, p->dst, constrainedMoves);
-		AddWorkList(u);
-		AddWorkList(v);
-	}
-	else if(Check(u, v)){
-		coalescedMoves = Live_MoveList(p->src, p->dst, coalescedMoves);
-		Combine(u, v);
-		AddWorkList(u);
-	}
-	else
-		activeMoves = Live_MoveList(p->src, p->dst, activeMoves);
-	
-}
+static void FreezeMoves(G_node u){
+	for(Live_moveList m = NodeMoves(u); m; m=m->tail)
+	{
+	    G_node v;
+	    if(GetAlias(m->dst) == GetAlias(u))
+		v = GetAlias(m->src);
+	    else
+		v = GetAlias(m->dst);
 
-static void FreezeMoves(G_node node){
-	Live_moveList ml = RMrelatedMovs(node, activeMoves);
-	if(inMoveList(node, activeMoves))
-		activeMoves = activeMoves->tail;
-	for(;ml;ml=ml->tail){
-		G_node src = GetAlias(ml->src);
-		G_node dst = GetAlias(ml->dst);
-		G_node v;
-		if(GetAlias(node) == src)
-			v = dst;
-		else
-			v = src;
-		frozenMoves = Live_MoveList(ml->src, ml->dst, frozenMoves);
+	    frozenMoves = Live_MoveList(m->src, m->dst, frozenMoves);
+	    activeMoves = Live_remove(m->src, m->dst, activeMoves);
 		
-		if(!G_inNodeList(v,precolored) && !inMoveList(v, activeMoves) && *(int *)G_look(degree, v)<REG_NUM){
-			freezeWorkList = G_removeNode(v, freezeWorkList);
-			simplifyWorkList = G_NodeList(v, simplifyWorkList);
-		}
-
+	    if(!G_inNodeList(v,precolored) && !inMoveList(v, activeMoves) && *(int *)G_look(degree, v)<REG_NUM)
+	    {
+		freezeWorkList = G_removeNode(v, freezeWorkList);
+		simplifyWorkList = G_NodeList(v, simplifyWorkList);
+	    }
 	}
 }
 
@@ -237,22 +246,20 @@ static void SelectSpill(){
 	simplifyWorkList = G_NodeList(node, simplifyWorkList);
 }
 
-Temp_tempList COL_rmColor(G_node t, Temp_tempList l){
-	Temp_temp c = Live_gtemp(t);
-	Temp_map map = Temp_layerMap(color, F_tempMap);
-
+Temp_tempList removeColor(G_node t, Temp_tempList l){
 	Temp_tempList last = NULL;
-	for(Temp_tempList p=l;p;p=p->tail){
-		if(!strcmp(Temp_look(map, c), Temp_look(map, p->head))){
-			if(last){
-				last->tail = p->tail;
-			}
-			else{
-				l = l->tail;
-			}
-			break;
-		}
-		last = p;
+	for(Temp_tempList p=l;p;p=p->tail)
+	{
+	    if(!strcmp(Temp_look(color, Live_gtemp(t)), Temp_look(color, p->head)))
+	    {
+		if(last)
+		    last->tail = p->tail;
+		else
+		    l = l->tail;
+			
+		break;
+	    }
+	    last = p;
 	}
 	return l;
 }
@@ -267,25 +274,28 @@ static void AssignColor(){
 		okColors = Temp_TempList(p->head,okColors);
 	
 		
-		for(G_nodeList adj=G_adj(node);adj;adj=adj->tail){
-			G_node w = adj->head;
-			if(G_inNodeList(GetAlias(w), G_unionNodeList(precolored, coloredNode))){
-				okColors = COL_rmColor(GetAlias(w), okColors);
-			}
-		}
+	    for(G_nodeList adj=G_adj(node);adj;adj=adj->tail)
+	    {
+		G_node w = adj->head;
+		if(G_inNodeList(GetAlias(w), G_unionNodeList(precolored, coloredNode)))
+		    okColors = removeColor(GetAlias(w), okColors);
+			
+	    }
 
-		if(!okColors)
-			spilledNode = G_NodeList(node, spilledNode);
+	    if(!okColors)
+		spilledNode = G_NodeList(node, spilledNode);
 		
-		else{
-			Temp_enter(color, Live_gtemp(node), Temp_look(F_tempMap, okColors->head));
-			coloredNode = G_NodeList(node, coloredNode);
-		}
+	    else
+	    {
+		Temp_enter(color, Live_gtemp(node), Temp_look(F_tempMap, okColors->head));
+		coloredNode = G_NodeList(node, coloredNode);
+	    }
 	}
 
-	for(G_nodeList nl=coalescedNode;nl;nl=nl->tail){
-		G_node node = nl->head;
-		Temp_enter(color, Live_gtemp(node), Temp_look(Temp_layerMap(color, F_tempMap), Live_gtemp(GetAlias(node))));
+	for(G_nodeList nl=coalescedNode;nl;nl=nl->tail)
+	{
+	    G_node node = nl->head;
+	    Temp_enter(color, Live_gtemp(node), Temp_look(color, Live_gtemp(GetAlias(node))));
 	}
 }
 
@@ -310,10 +320,11 @@ struct RA_result RA_regAlloc(F_frame f, AS_instrList il) {
 
 	degree = G_empty();
 	alias = G_empty();
-
+	moveList = NULL;
 	color = Temp_empty();
+	color = Temp_layerMap(color, F_tempMap);
 
-	worklistMoves = lg.moves;
+	worklistMoves = moveList = lg.moves;
 	MakeWorkList(lg.graph);
 		
 	do 
@@ -329,15 +340,13 @@ struct RA_result RA_regAlloc(F_frame f, AS_instrList il) {
 	} while(simplifyWorkList || worklistMoves || freezeWorkList || spillWorkList);
 		
 	AssignColor();
-
-	Temp_map map = Temp_layerMap(color,Temp_layerMap(F_tempMap, Temp_name()));
 	
 	if(spilledNode){
 		AS_instrList nil = AS_rewriteSpill(f, il, spilledNode);
 		return RA_regAlloc(f, nil);
 	}
 
-	AS_rewrite(il, map);
+	AS_rewrite(il, color);
 					
 
 	struct RA_result ret;
