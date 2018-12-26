@@ -117,75 +117,55 @@ void Temp_dumpMap(FILE *out, Temp_map m) {
   }
 }
 
-//my helper funcs
-
 Temp_tempList Temp_catList(Temp_tempList a, Temp_tempList b){
-    Temp_tempList li = NULL;
-    for(Temp_tempList p=a;p;p=p->tail){
-        li = Temp_TempList(p->head,li);
-    }
-    for(Temp_tempList p=b;p;p=p->tail){
-        li = Temp_TempList(p->head,li);
-    }
-    return li;
+    	Temp_tempList li = NULL;
+    	for(Temp_tempList p=a;p;p=p->tail)
+            li = Temp_TempList(p->head,li);
+    
+   	for(Temp_tempList p=b;p;p=p->tail)
+            li = Temp_TempList(p->head,li);
+    
+    	return li;
 }
 
 bool Temp_inList(Temp_tempList list, Temp_temp t){
-	for(;list;list=list->tail){
-		Temp_temp tt = list->head;
-		if(Temp_int(tt) == Temp_int(t)){
-			return TRUE;
-		}
-	}
+	for(;list;list=list->tail)
+	    if(list->head == t)
+		return TRUE;
+
 	return FALSE;
 }
 
-
-Temp_tempList Temp_Union(Temp_tempList A, Temp_tempList B){
-	Temp_tempList list = NULL;
-	for(;A;A=A->tail){
-		Temp_temp tt = A->head;
-		list = Temp_TempList(tt, list);
-	}
-	//Temp_tempList list = A;
-	for(;B;B=B->tail){
-		Temp_temp tt = B->head;
-		if(!Temp_inList(A, tt)){
-			list = Temp_TempList(tt, list);
-		}
+Temp_tempList Temp_Union(Temp_tempList tl1, Temp_tempList tl2){
+  	Temp_tempList list = tl1;
+	for(; tl2; tl2=tl2->tail)
+	{
+	    Temp_temp temp = tl2->head;
+	    if(!Temp_inList(tl1, temp))
+		list = Temp_TempList(temp, list);
 	}
 	return list;
 }
-Temp_tempList Temp_UnionCombine(Temp_tempList A, Temp_tempList B){
-  Temp_tempList list = A;
-	for(;B;B=B->tail){
-		Temp_temp tt = B->head;
-		if(!Temp_inList(A, tt)){
-			list = Temp_TempList(tt, list);
-		}
-	}
-	return list;
-}
-Temp_tempList Temp_Minus(Temp_tempList A, Temp_tempList B){
+Temp_tempList Temp_Minus(Temp_tempList tl1, Temp_tempList tl2){
 	Temp_tempList list = NULL;
-	for(;A;A=A->tail){
-		Temp_temp tt = A->head;
-		if(!Temp_inList(B, tt)){
-			list = Temp_TempList(tt, list);
-		}
+	for(; tl1; tl1=tl1->tail)
+	{
+	    Temp_temp temp = tl1->head;
+	    if(!Temp_inList(tl2, temp))
+		list = Temp_TempList(temp, list);
+		
 	}
 	return list;
 }
 bool Temp_Equal(Temp_tempList A, Temp_tempList B){
-	if(Temp_Minus(A,B)==NULL && Temp_Minus(B,A)==NULL){
-		return TRUE;
-	}
+	if(Temp_Minus(A,B)==NULL && Temp_Minus(B,A)==NULL)
+	    return TRUE;
+	
 	return FALSE;
 }
 
 void Temp_replace(Temp_temp old, Temp_temp fresh, Temp_tempList li){
-  for(Temp_tempList p=li;p;p=p->tail){
-    if(p->head == old) 
-      p->head=fresh;
-  }
+  	for(Temp_tempList p=li;p;p=p->tail)
+    	    if(p->head == old) 
+      		p->head=fresh;
 }

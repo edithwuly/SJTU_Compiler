@@ -49,28 +49,28 @@ static void doProc(FILE *out, F_frame frame, T_stm body)
 
  //F_tempMap = Temp_empty();
 
- printf("doProc for function %s:\n", S_name(F_name(frame)));
- printStmList(stdout, T_StmList(body, NULL));
- printf("-------====IR tree=====-----\n");
+ //printf("doProc for function %s:\n", S_name(F_name(frame)));
+ //printStmList(stdout, T_StmList(body, NULL));
+ //printf("-------====IR tree=====-----\n");
 
  stmList = C_linearize(body);
- printStmList(stdout, stmList);
- printf("-------====Linearlized=====-----\n");
+ //printStmList(stdout, stmList);
+ //printf("-------====Linearlized=====-----\n");
 
  blo = C_basicBlocks(stmList);
  C_stmListList stmLists = blo.stmLists;
- for (; stmLists; stmLists = stmLists->tail) {
+ /*for (; stmLists; stmLists = stmLists->tail) {
  	printStmList(stdout, stmLists->head);
 	printf("------====Basic block=====-------\n");
- }
+ }*/
 
  stmList = C_traceSchedule(blo);
- printStmList(stdout, stmList);
- printf("-------====trace=====-----\n");
+ //printStmList(stdout, stmList);
+ //printf("-------====trace=====-----\n");
 
  iList  = F_codegen(frame, stmList); /* 9 */
  //AS_printInstrList(stdout, iList, Temp_layerMap(F_tempMap, Temp_name()));
- printf("----======before RA=======-----\n");
+ //printf("----======before RA=======-----\n");
 
  
 /* 11 */
@@ -156,11 +156,9 @@ int main(int argc, string *argv)
    int cnt = 0;
    for (;frags;frags=frags->tail){   
      if (frags->head->kind == F_procFrag) {
-printf("F_procFrag\n");
        doProc(out, frags->head->u.proc.frame, frags->head->u.proc.body);
 	    }
      else if (frags->head->kind == F_stringFrag) {
-printf("F_stringFrag\n");
 	    doStr(out, frags->head->u.stringg.label, frags->head->u.stringg.str);
      }
    }

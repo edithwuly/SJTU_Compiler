@@ -39,7 +39,7 @@ static Temp_map color;
 static Live_moveList NodeMoves(G_node n){
 	Live_moveList l = NULL;
 	for (Live_moveList rel = RMrelatedMovs(n, moveList); rel; rel=rel->tail)
-	    if((rel->src != n && inMoveList(rel->src, activeMoves)) || (rel->dst != n && inMoveList(rel->dst, worklistMoves)))	
+	    if((rel->src != n && inMoveList(rel->src, rel->dst, activeMoves)) || (rel->dst != n && inMoveList(rel->src, rel->dst, worklistMoves)))	
 		l = Live_MoveList(rel->src, rel->dst, l);
 	return l;
 }
@@ -58,7 +58,7 @@ static void EnableMoves(G_nodeList nodes){
 	    G_node n = nodes->head;
 	    for (Live_moveList rel = NodeMoves(n); rel; rel=rel->tail)
 	    {
-	    	if((rel->src != n && inMoveList(rel->src, activeMoves)) || (rel->dst != n && inMoveList(rel->dst, worklistMoves)))
+	    	if((rel->src != n && inMoveList(rel->src, rel->dst, activeMoves)) || (rel->dst != n && inMoveList(rel->src, rel->dst, worklistMoves)))
 	    	{
 		    activeMoves = Live_remove(rel->src, rel->dst, activeMoves);	
 		    worklistMoves = Live_MoveList(rel->src, rel->dst, worklistMoves);
@@ -226,7 +226,7 @@ static void FreezeMoves(G_node u){
 	    frozenMoves = Live_MoveList(m->src, m->dst, frozenMoves);
 	    activeMoves = Live_remove(m->src, m->dst, activeMoves);
 		
-	    if(!G_inNodeList(v,precolored) && !inMoveList(v, activeMoves) && *(int *)G_look(degree, v)<REG_NUM)
+	    if(!NodeMoves(v) && *(int *)G_look(degree, v)<REG_NUM)
 	    {
 		freezeWorkList = G_removeNode(v, freezeWorkList);
 		simplifyWorkList = G_NodeList(v, simplifyWorkList);

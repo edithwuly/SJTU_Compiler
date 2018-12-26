@@ -200,15 +200,15 @@ void AS_rewrite(AS_instrList iList, Temp_map m){
 }
 
 char *strrpc(char *str,char *oldstr,char *newstr){
-    char bstr[strlen(str)];//转换缓冲区
+    char bstr[strlen(str)];
     memset(bstr,0,sizeof(bstr));
  
     for(int i = 0;i < strlen(str);i++){
-        if(!strncmp(str+i,oldstr,strlen(oldstr))){//查找目标字符串
+        if(!strncmp(str+i,oldstr,strlen(oldstr))){
             strcat(bstr,newstr);
             i += strlen(oldstr) - 1;
         }else{
-        	strncat(bstr,str + i,1);//保存一字节进缓冲区
+        	strncat(bstr,str + i,1);
 	    }
     }
  
@@ -224,7 +224,6 @@ void AS_rewriteFrameSize(AS_instrList iList, string target, string len){
     string ass = ins->u.MOVE.assem;
     if(strstr(ass, target)){
       char *n = strrpc(ass, target, len);
-      //printf("after rpl:%s\n", n);
       ins->u.MOVE.assem = String(n);
     }    
   }
