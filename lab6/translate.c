@@ -168,13 +168,13 @@ static Tr_level outermost = NULL;
 Tr_level Tr_outermost(void) 
 {
 	if (outermost)
-		return outermost;
+	    return outermost;
 	else 
 	{
-		outermost = checked_malloc(sizeof(*outermost));
-		outermost->frame = F_newFrame(Temp_namedlabel("outermost"), NULL);
-		outermost->parent = NULL;
-		return outermost;
+	    outermost = checked_malloc(sizeof(*outermost));
+	    outermost->frame = F_newFrame(Temp_namedlabel("tigermain"), NULL);
+	    outermost->parent = NULL;
+	    return outermost;
 	}
 }
 
@@ -182,15 +182,16 @@ static Tr_level tigermain = NULL;
 Tr_level Tr_tigermain(void) 
 {
 	if (tigermain)
-		return tigermain;
+	    return tigermain;
 	else 
 	{
-		tigermain = checked_malloc(sizeof(*outermost));
-		tigermain->frame = F_newFrame(Temp_namedlabel("tigermain"), NULL);
-		tigermain->parent = Tr_outermost();
-		return tigermain;
+	    tigermain = checked_malloc(sizeof(*outermost));
+	    tigermain->frame = F_newFrame(Temp_namedlabel("tigermain"), NULL);
+	    tigermain->parent = Tr_outermost();
+	    return tigermain;
 	}
 }
+
 Tr_level Tr_newLevel(Tr_level parent, Temp_label name, U_boolList formals){
 	Tr_level l = checked_malloc(sizeof(*l));
 	U_boolList newl = U_BoolList(TRUE, formals);

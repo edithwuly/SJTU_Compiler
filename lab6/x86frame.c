@@ -13,18 +13,13 @@
 
 const int F_wordsize = 8;
 
-//F_frame_ in PPT
 struct F_frame_ {
 	Temp_label name;	
 	F_accessList formals;
 	F_accessList locals;
-	int argSize;
 	int size;
-	F_accessList calleesaves;
-	F_accessList callersaves;
 };
 
-//varibales
 struct F_access_ {
 	enum {inFrame, inReg} kind;
 	union {
@@ -33,7 +28,6 @@ struct F_access_ {
 	} u;
 };
 
-/* functions */
 static F_access InFrame(int offset){
 	F_access ac = checked_malloc(sizeof(*ac));
 
@@ -41,9 +35,6 @@ static F_access InFrame(int offset){
 	ac->u.offset = offset;
 	return ac;
 }   
-int F_getFrameOff(F_access acc){
-	return acc->u.offset;
-}
 
 static F_access InReg(Temp_temp reg){
 	F_access ac = checked_malloc(sizeof(*ac));
@@ -61,73 +52,28 @@ F_accessList F_AccessList(F_access head, F_accessList tail){
 	return l;
 }
 
-F_accessList makeFormals(F_frame f, U_boolList formals, int* cntp){
+F_accessList makeFormals(F_frame f, U_boolList formals){
 	if(!formals)
 	    return NULL;
 
 	bool esc = formals->head;
-	(*cntp)++;
-	F_access ac = F_allocLocal(f, esc);//args;
+	F_access ac = F_allocLocal(f, esc);
 	
-	return F_AccessList(ac, makeFormals(f, formals->tail, cntp));
-}
-
-F_accessList F_callerPos(F_frame f){
-	Temp_tempList regs =  F_callerSave();
-	F_accessList l = NULL;
-	F_accessList last = NULL;
-	for(;regs;regs=regs->tail){
-		F_access acc = F_allocLocal(f,FALSE);
-		if(!last){
-			last = F_AccessList(acc, NULL);
-			l = last;
-		}
-		else{
-			last->tail = F_AccessList(acc, NULL);
-			last = last->tail;
-		}
-	}
-	return l;
-}
-
-F_accessList F_calleePos(F_frame f){
-	Temp_tempList regs = F_calleeSave();
-	F_accessList l = NULL;
-	F_accessList last = NULL;
-	for(;regs;regs=regs->tail){
-		F_access acc = F_allocLocal(f,FALSE);
-		if(!last){
-			last = F_AccessList(acc, NULL);
-			l = last;
-		}
-		else{
-			last->tail = F_AccessList(acc, NULL);
-			last = last->tail;
-		}
-	}
-	return l;
+	return F_AccessList(ac, makeFormals(f, formals->tail));
 }
 
 F_frame F_newFrame(Temp_label name, U_boolList formals){
 	F_frame f = checked_malloc(sizeof(*f));
 	f->size = 0;
-	int *argsize = checked_malloc(sizeof(int));
-	*argsize = 0;
 	f->name = name;
-	f->formals = makeFormals(f, formals, argsize);
+	f->formals = makeFormals(f, formals);
 	f->locals = NULL;
-	f->argSize = *argsize;
-	
-
-	f->calleesaves = F_calleePos(f);
-	f->callersaves = F_callerPos(f);
 
 	return f;
 }
 
 F_access F_allocLocal(F_frame f, bool escape){
 	int size = f->size;
-	F_accessList locals = f->locals;
 
 	F_access ac;
 	if(escape)
@@ -138,7 +84,7 @@ F_access F_allocLocal(F_frame f, bool escape){
 	else
 	    ac = InReg(Temp_newtemp());
 	
-	f->locals = F_AccessList(ac, locals);
+	f->locals = F_AccessList(ac, f->locals);
 
 	return ac;
 }
@@ -146,11 +92,18 @@ F_access F_allocLocal(F_frame f, bool escape){
 Temp_label F_name(F_frame f){
 	return f->name;
 }
+
 F_accessList F_formals(F_frame f){
 	return f->formals;
 }
+
 int F_size(F_frame f){
 	return f->size;
+}
+
+
+int F_getFrameOff(F_access acc){
+	return acc->u.offset;
 }
 
 static Temp_temp rax = NULL;
@@ -331,61 +284,62 @@ Temp_temp F_R15(void) {
 
 static Temp_temp fp  = NULL;
 Temp_temp F_FP(void){
-	
-	if(!fp){
-		fp = Temp_newtemp();
-		Temp_enter(F_tempMap, fp, "fp");
+	if(!fp)
+	{
+	    fp = Temp_newtemp();
+	    Temp_enter(F_tempMap, fp, "fp");
 	}
 	return fp;
 }
+
 Temp_temp F_SP(void){
 	return F_RSP();
 }
+
 Temp_temp F_RV(void){
 	return F_RAX();
 }
 
 static Temp_tempList args = NULL;
 Temp_tempList F_Args(){
-	if(!args){
-		args = Temp_TempList(F_RDI(),Temp_TempList(F_RSI(),Temp_TempList(F_RDX(),Temp_TempList(F_RCX(),Temp_TempList(F_R8(),Temp_TempList(F_R9(),NULL))))));
-	}
+	if(!args)
+	    args = Temp_TempList(F_RDI(),Temp_TempList(F_RSI(),Temp_TempList(F_RDX(),Temp_TempList(F_RCX(),Temp_TempList(F_R8(),Temp_TempList(F_R9(),NULL))))));
+	
 	return args;
 }
 
 static Temp_tempList callerSave = NULL;
 Temp_tempList F_callerSave(){
-	if(!callerSave){
-		callerSave = Temp_catList(F_Args(), Temp_TempList(F_R10(), Temp_TempList(F_R11(), NULL)));
-	}
+	if(!callerSave)
+	    callerSave = Temp_catList(F_Args(), Temp_TempList(F_R10(), Temp_TempList(F_R11(), NULL)));
+	
 	return callerSave;
 }
 
 static Temp_tempList calleeSave = NULL;
 Temp_tempList F_calleeSave(){	
-	if(!calleeSave){
-		calleeSave = Temp_TempList(F_R12(),Temp_TempList(F_R13(),Temp_TempList(F_R14(),Temp_TempList(F_R15(),Temp_TempList(F_RBX(),Temp_TempList(F_RBP(), NULL))))));
-	}
+	if(!calleeSave)
+	    calleeSave = Temp_TempList(F_R12(),Temp_TempList(F_R13(),Temp_TempList(F_R14(),Temp_TempList(F_R15(),Temp_TempList(F_RBX(),Temp_TempList(F_RBP(), NULL))))));
+	
 	return calleeSave;
 }
 
 static Temp_tempList regs = NULL;
 Temp_tempList F_register(){
-	if(!regs){
-		regs = Temp_TempList(F_RSP(),Temp_TempList(F_RAX(),F_calleeSave()));
-		regs = Temp_catList(regs, F_callerSave());
+	if(!regs)
+	{
+	    regs = Temp_TempList(F_RSP(),Temp_TempList(F_RAX(),F_calleeSave()));
+	    regs = Temp_catList(regs, F_callerSave());
 	}
 	return regs;											
 }
 
 T_exp F_exp(F_access acc, T_exp framePtr){
-	if(acc->kind == inFrame){
-		int off = acc->u.offset;
-		return T_Mem(T_Binop(T_plus, T_Const(off), framePtr));
-	}
-	else{
-		return T_Temp(acc->u.reg);
-	}
+	if(acc->kind == inFrame)
+	    return T_Mem(T_Binop(T_plus, T_Const(acc->u.offset), framePtr));
+
+	return T_Temp(acc->u.reg);
+	
 }
 
 T_exp F_externalCall(string s, T_expList args){
@@ -420,59 +374,76 @@ F_fragList F_FragList(F_frag head, F_fragList tail) {
 }                                                     
 
 T_stm F_procEntryExit1(F_frame f, T_stm stm){
-	//view change
 	T_stm view = NULL;
 	int cnt = 0;
-	T_exp fp = T_Temp(F_FP());
-	for(F_accessList l=f->formals;l;l=l->tail,cnt++){
-		F_access arg = l->head;
-		T_exp argpos = F_exp(arg,fp);
-		switch(cnt){
-			case 0:view=T_Move(argpos,T_Temp(F_RDI()));break;
-			case 1:view = T_Seq(T_Move(argpos,T_Temp(F_RSI())),view);break;
-			case 2:view = T_Seq(T_Move(argpos,T_Temp(F_RDX())),view);break;
-			case 3:view = T_Seq(T_Move(argpos,T_Temp(F_RCX())),view);break;
-			case 4:view = T_Seq(T_Move(argpos,T_Temp(F_R8())),view);break;
-			case 5:view = T_Seq(T_Move(argpos,T_Temp(F_R9())),view);break;
-			default:
-			{
-				int off = (cnt-6+1)*F_wordsize;
-				view = T_Seq(T_Move(argpos,T_Mem(T_Binop(T_plus, T_Const(off), fp))),view);
-			}
+	
+	for(F_accessList l=f->formals;l;l=l->tail,cnt++)
+	{
+	    switch(cnt)
+	    {
+		case 0:
+		    view = T_Move(F_exp(l->head, T_Temp(F_FP())),T_Temp(F_RDI()));
+		    break;
+		case 1:
+		    view = T_Seq(T_Move(F_exp(l->head, T_Temp(F_FP())),T_Temp(F_RSI())),view);
+		    break;
+		case 2:
+		    view = T_Seq(T_Move(F_exp(l->head, T_Temp(F_FP())),T_Temp(F_RDX())),view);
+		    break;
+		case 3:
+		    view = T_Seq(T_Move(F_exp(l->head, T_Temp(F_FP())),T_Temp(F_RCX())),view);
+		    break;
+		case 4:
+		    view = T_Seq(T_Move(F_exp(l->head, T_Temp(F_FP())),T_Temp(F_R8())),view);
+		    break;
+		case 5:
+		    view = T_Seq(T_Move(F_exp(l->head, T_Temp(F_FP())),T_Temp(F_R9())),view);
+		    break;
+		default:
+		{
+		    T_exp fp = T_Temp(F_FP());
+		    view = T_Seq(T_Move(F_exp(l->head, fp),T_Mem(T_Binop(T_plus, T_Const((cnt-5)*F_wordsize),fp))),view);
 		}
+	    }
 	}
 
-	//callee save
+	F_accessList l = NULL;
+	F_accessList last = NULL;
 	T_stm save = NULL;
-	F_accessList al = f->calleesaves;
-	Temp_tempList tl = F_calleeSave();
-	for(;tl;tl=tl->tail, al=al->tail){
-		T_exp pos = F_exp(al->head, fp);
-		if(save){
-			save = T_Seq(T_Move(pos, T_Temp(tl->head)), save);
-		}
-		else{
-			save = T_Move(pos, T_Temp(tl->head));
-		}
+	for(Temp_tempList tl = F_calleeSave();tl;tl=tl->tail)
+	{
+	    F_access acc = F_allocLocal(f,FALSE);
+	    if(!last)
+	    {
+		last = F_AccessList(acc, NULL);
+		l = last;
+	    }
+	    else
+	    {
+		last->tail = F_AccessList(acc, NULL);
+		last = last->tail;
+	    }
+	    T_exp pos = F_exp(acc, fp);
+	    if(save)
+		save = T_Seq(T_Move(pos, T_Temp(tl->head)), save);
+	    else
+		save = T_Move(pos, T_Temp(tl->head));
 	}
 
-	//callee restore
 	T_stm restore = NULL;
-	al = f->calleesaves;
-	tl = F_calleeSave();
-	for(;tl;tl=tl->tail, al=al->tail){
-		T_exp pos = F_exp(al->head, fp);
-		if(restore){
-			restore = T_Seq(T_Move(T_Temp(tl->head),pos), restore);
-		}
-		else{
-			restore = T_Move(T_Temp(tl->head), pos);
-		}
+	for(Temp_tempList tl = F_calleeSave();tl;tl=tl->tail, l=l->tail)
+	{
+	    T_exp pos = F_exp(l->head, fp);
+	    if(restore)
+		restore = T_Seq(T_Move(T_Temp(tl->head),pos), restore);	
+	    else
+		restore = T_Move(T_Temp(tl->head), pos);
+		
 	}
 
-	if(!view){
-		return T_Seq(save,T_Seq(stm, restore));
-	}
+	if(!view)
+	    return T_Seq(save,T_Seq(stm, restore));
+	
 	return T_Seq(save,T_Seq(view, T_Seq(stm, restore)));
 }
 

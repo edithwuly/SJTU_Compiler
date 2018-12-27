@@ -62,10 +62,6 @@ Temp_temp Live_gtemp(G_node n) {
 	return G_nodeInfo(n);
 }
 
-Temp_tempList F_registers(void) {
-	return Temp_TempList(F_RAX(), Temp_catList(F_calleeSave(), F_callerSave()));
-}
-
 bool inMoveList(G_node src, G_node dst, Live_moveList moves)
 {
 	for(; moves; moves = moves->tail) 
@@ -92,10 +88,10 @@ static void addEdge(G_graph ig, Temp_temp temp1, Temp_temp temp2, TAB_table temp
 	G_node b = getOrCreateNode(ig, temp2, temp_node_table);
 	if(!G_inNodeList(a, G_adj(b))){
 
-		if(!Temp_inList(F_registers(), temp1)) {
+		if(!Temp_inList(F_register(), temp1)) {
 			G_addEdge(a, b);
 		}
-		if(!Temp_inList(F_registers(), temp2)) {
+		if(!Temp_inList(F_register(), temp2)) {
 			G_addEdge(b, a);
 		}
 	}
@@ -148,8 +144,8 @@ struct Live_graph Live_liveness(G_graph flow) {
 	}
 
 	TAB_table temp_node_table = TAB_empty();
-	for(Temp_tempList temps1 = F_registers(); temps1; temps1 = temps1->tail) {
-		for(Temp_tempList temps2 = F_registers(); temps2; temps2 = temps2->tail) {
+	for(Temp_tempList temps1 = F_register(); temps1; temps1 = temps1->tail) {
+		for(Temp_tempList temps2 = F_register(); temps2; temps2 = temps2->tail) {
 			addEdge(lg.graph, temps1->head, temps2->head, temp_node_table);
 		}
 
