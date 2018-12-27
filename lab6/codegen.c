@@ -293,7 +293,7 @@ static Temp_tempList munchArgs(int cnt, T_expList args){
 	    default:
 		munchArgs(cnt+1, args->tail);
             	char *a = checked_malloc(BUFSIZE * sizeof(char));
-            	sprintf(a, "movq `s0, %d(`s1)", (cnt-6)*F_wordsize);
+            	sprintf(a, "movq `s0, %d(`s1)", (cnt-6)*F_wordSize);
             	emit(AS_Move(a, NULL, L(src,L(F_RSP(),NULL))));
             	return NULL;
 	}

@@ -11,7 +11,7 @@
 
 /*Lab5: Your implementation here.*/
 
-const int F_wordsize = 8;
+const int F_wordSize = 8;
 
 struct F_frame_ {
 	Temp_label name;	
@@ -78,7 +78,7 @@ F_access F_allocLocal(F_frame f, bool escape){
 	F_access ac;
 	if(escape)
 	{
-	    ac = InFrame(-(size+1) * F_wordsize);
+	    ac = InFrame(-(size+1) * F_wordSize);
 	    f->size++;
 	}
 	else
@@ -376,7 +376,7 @@ F_fragList F_FragList(F_frag head, F_fragList tail) {
 T_stm F_procEntryExit1(F_frame f, T_stm stm){
 	T_stm view = NULL;
 	int cnt = 0;
-	
+	T_exp fp = T_Temp(F_FP());
 	for(F_accessList l=f->formals;l;l=l->tail,cnt++)
 	{
 	    switch(cnt)
@@ -399,11 +399,8 @@ T_stm F_procEntryExit1(F_frame f, T_stm stm){
 		case 5:
 		    view = T_Seq(T_Move(F_exp(l->head, T_Temp(F_FP())),T_Temp(F_R9())),view);
 		    break;
-		default:
-		{
-		    T_exp fp = T_Temp(F_FP());
-		    view = T_Seq(T_Move(F_exp(l->head, fp),T_Mem(T_Binop(T_plus, T_Const((cnt-5)*F_wordsize),fp))),view);
-		}
+		default:		    
+		    view = T_Seq(T_Move(F_exp(l->head, fp),T_Mem(T_Binop(T_plus, T_Const((cnt-5)*F_wordSize),fp))),view);
 	    }
 	}
 
@@ -461,7 +458,7 @@ AS_proc F_procEntryExit3(F_frame frame, AS_instrList body){
 	char target[100];
 	char length[20];
 	sprintf(target, "%s_framesize", fn);
-	sprintf(length, "%d", F_wordsize*size);
+	sprintf(length, "%d", F_wordSize*size);
 	AS_rewriteFrameSize(body, target, length);
 
 	return AS_Proc("", body, "");

@@ -50,7 +50,7 @@ Temp_tempList F_callerSave();
 Temp_tempList F_calleeSave();
 Temp_tempList F_register();
 
-extern const int F_wordsize;
+extern const int F_wordSize;
 T_exp F_exp(F_access acc, T_exp framePtr);
 T_exp F_externalCall(string s, T_expList args);
 

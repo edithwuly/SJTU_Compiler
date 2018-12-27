@@ -239,11 +239,11 @@ Tr_exp Tr_simpleVar(Tr_access acc, Tr_level l){
 }
 
 Tr_exp Tr_fieldVar(Tr_exp addr, int num){
-	return Tr_Ex(T_Mem(T_Binop(T_plus, unEx(addr), T_Const(num * F_wordsize))));
+	return Tr_Ex(T_Mem(T_Binop(T_plus, unEx(addr), T_Const(num * F_wordSize))));
 }
 
 Tr_exp Tr_subscriptVar(Tr_exp addr, Tr_exp off){
-	return Tr_Ex(T_Mem(T_Binop(T_plus,T_Binop(T_mul, T_Const(F_wordsize), unEx(off)), unEx(addr))));
+	return Tr_Ex(T_Mem(T_Binop(T_plus,T_Binop(T_mul, T_Const(F_wordSize), unEx(off)), unEx(addr))));
 }
 
 Tr_exp Tr_Nil(){
@@ -332,7 +332,7 @@ Tr_exp Tr_strCompExp(A_oper op, Tr_exp left, Tr_exp right){
 T_stm createFields(Temp_temp r, int num, Tr_expList fields) 
 {
 	if (fields) 
-		return T_Seq(T_Move(T_Mem(T_Binop(T_plus, T_Temp(r), T_Const(num * F_wordsize))), unEx(fields->head)), createFields(r, num-1, fields->tail)); 
+		return T_Seq(T_Move(T_Mem(T_Binop(T_plus, T_Temp(r), T_Const(num * F_wordSize))), unEx(fields->head)), createFields(r, num-1, fields->tail)); 
 
 	return T_Exp(T_Const(0));
 }
@@ -340,7 +340,7 @@ T_stm createFields(Temp_temp r, int num, Tr_expList fields)
 Tr_exp Tr_Record(Tr_expList fields, int num) 
 {
 	Temp_temp r = Temp_newtemp();
-	T_exp ex = T_Eseq(T_Move(T_Temp(r), F_externalCall("malloc", T_ExpList(T_Const(num * F_wordsize), NULL))),
+	T_exp ex = T_Eseq(T_Move(T_Temp(r), F_externalCall("malloc", T_ExpList(T_Const(num * F_wordSize), NULL))),
 		    T_Eseq(createFields(r, num-1, fields), T_Temp(r)));
 
     	return Tr_Ex(ex);
@@ -457,7 +457,7 @@ Tr_exp Tr_Array(Tr_exp size, Tr_exp init)
 
 	T_exp ex = T_Eseq(T_Move(T_Temp(n), unEx(size)),
 		    T_Eseq(T_Move(T_Temp(i), unEx(init)),
-		     T_Eseq(T_Move(T_Temp(r), F_externalCall("initArray", T_ExpList(T_Binop(T_mul, T_Temp(n), T_Const(F_wordsize)), T_ExpList(T_Temp(i) , NULL)))), T_Temp(r))));
+		     T_Eseq(T_Move(T_Temp(r), F_externalCall("initArray", T_ExpList(T_Binop(T_mul, T_Temp(n), T_Const(F_wordSize)), T_ExpList(T_Temp(i) , NULL)))), T_Temp(r))));
 
     	return Tr_Ex(ex);
 }

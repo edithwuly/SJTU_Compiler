@@ -42,19 +42,22 @@ Live_moveList Live_remove(G_node src, G_node dst, Live_moveList l){
 }
 
 Live_moveList RMrelatedMovs(G_node node, Live_moveList list){
-    Live_moveList li = NULL;
-    Live_moveList last = NULL;
-    for(;list;list = list->tail){
-        if(node == list->dst || node == list->src){
-            li = Live_MoveList(list->src, list->dst, li);
-            if(last){
-                last->tail = list->tail;
-                list = last;
+    	Live_moveList li = NULL;
+    	Live_moveList last = NULL;
+    	for(;list;list = list->tail)
+	{
+            if(node == list->dst || node == list->src)
+	    {
+            	li = Live_MoveList(list->src, list->dst, li);
+            	if(last)
+		{
+                    last->tail = list->tail;
+                    list = last;
+        	}
             }
-        }
-        last = list;
-    }
-    return li;
+            last = list;
+    	}
+    	return li;
 }
 
 Temp_temp Live_gtemp(G_node n) {
@@ -72,28 +75,25 @@ bool inMoveList(G_node src, G_node dst, Live_moveList moves)
 }
 
 
-static G_node getOrCreateNode(G_graph g, Temp_temp temp, TAB_table temp_node_table) {
-	G_node node = TAB_look(temp_node_table, temp);
-	if(!node) {
-		node = G_Node(g, temp);
-		TAB_enter(temp_node_table, temp, node);
+G_node getNode(G_graph g, Temp_temp temp, TAB_table tempNode) {
+	G_node node = TAB_look(tempNode, temp);
+	if(!node) 
+	{
+	    node = G_Node(g, temp);
+	    TAB_enter(tempNode, temp, node);
 	}
 	return node;
 }
 
-static void addEdge(G_graph ig, Temp_temp temp1, Temp_temp temp2, TAB_table temp_node_table) {
+void addEdge(G_graph g, Temp_temp temp1, Temp_temp temp2, TAB_table tempNode) {
 	if(temp1 == temp2) return;
 
-	G_node a = getOrCreateNode(ig, temp1, temp_node_table);
-	G_node b = getOrCreateNode(ig, temp2, temp_node_table);
-	if(!G_inNodeList(a, G_adj(b))){
-
-		if(!Temp_inList(F_register(), temp1)) {
-			G_addEdge(a, b);
-		}
-		if(!Temp_inList(F_register(), temp2)) {
-			G_addEdge(b, a);
-		}
+	G_node a = getNode(g, temp1, tempNode);
+	G_node b = getNode(g, temp2, tempNode);
+	if(!G_inNodeList(a, G_adj(b)))
+	{
+	    G_addEdge(a, b);
+	    G_addEdge(b, a);
 	}
 }
 
@@ -112,69 +112,57 @@ struct Live_graph Live_liveness(G_graph flow) {
 	lg.graph = G_Graph();
 	lg.moves = NULL;
 
-	G_table in_set_table = G_empty();
-	G_table out_set_table = G_empty();
-	bool has_change = TRUE;
+	G_table inSet = G_empty();
+	G_table outSet = G_empty();
+	bool done = FALSE;
 
-	while(has_change) {
-		has_change = FALSE;
-		for(G_nodeList flownodes = G_nodes(flow); flownodes; flownodes = flownodes->tail) {
-			Temp_tempList old_in_set = G_look(in_set_table, flownodes->head);
-			Temp_tempList old_out_set = G_look(out_set_table, flownodes->head);
-			Temp_tempList use_set = FG_use(flownodes->head);
-			Temp_tempList def_set = FG_def(flownodes->head);
+	while(!done) 
+	{
+	    done = TRUE;
+	    for(G_nodeList flownodes = G_nodes(flow); flownodes; flownodes = flownodes->tail) 
+	    {
+		Temp_tempList in_ = G_look(inSet, flownodes->head);
+		Temp_tempList out_ = G_look(outSet, flownodes->head);
+		Temp_tempList use = FG_use(flownodes->head);
+		Temp_tempList def = FG_def(flownodes->head);
 
-			Temp_tempList new_in_set = Temp_Union(use_set, Temp_Minus(old_out_set, def_set));
-			Temp_tempList new_out_set = NULL;
+		Temp_tempList in = Temp_Union(use, Temp_Minus(out_, def));
+		Temp_tempList out = NULL;
 
-			for(G_nodeList nodes = G_succ(flownodes->head); nodes; nodes = nodes->tail) {
-				new_out_set = Temp_Union(new_out_set, G_look(in_set_table, nodes->head));
-			}
-
-			if(!Temp_Equal(old_in_set, new_in_set)) {
-				has_change = TRUE;
-				G_enter(in_set_table, flownodes->head, new_in_set);
-			}
-
-			if(!Temp_Equal(old_out_set, new_out_set)) {
-				has_change = TRUE;
-				G_enter(out_set_table, flownodes->head, new_out_set);
-			}
+		for(G_nodeList nodes = G_succ(flownodes->head); nodes; nodes = nodes->tail) 
+		    out = Temp_Union(G_look(inSet, nodes->head), out);
+			
+		if(!Temp_Equal(in_, in)) 
+		{
+		    done = FALSE;
+		    G_enter(inSet, flownodes->head, in);
 		}
+
+		if(!Temp_Equal(out_, out)) 
+		{
+		    done = FALSE;
+		    G_enter(outSet, flownodes->head, out);
+		}
+	    }
 	}
 
-	TAB_table temp_node_table = TAB_empty();
-	for(Temp_tempList temps1 = F_register(); temps1; temps1 = temps1->tail) {
-		for(Temp_tempList temps2 = F_register(); temps2; temps2 = temps2->tail) {
-			addEdge(lg.graph, temps1->head, temps2->head, temp_node_table);
-		}
+	TAB_table tempNode = TAB_empty();
 
-	}
+	for(G_nodeList flownodes = G_nodes(flow); flownodes; flownodes = flownodes->tail) 
+	{
+	    Temp_tempList liveouts = G_look(outSet, flownodes->head);
+	    if(FG_isMove(flownodes->head)) 
+	    {
+		liveouts = Temp_Minus(liveouts, FG_use(flownodes->head));
+		for(Temp_tempList defs = FG_def(flownodes->head); defs; defs = defs->tail) 
+		    for(Temp_tempList uses = FG_use(flownodes->head); uses; uses = uses->tail) 
+			lg.moves = Live_MoveList(getNode(lg.graph,uses->head,tempNode),getNode(lg.graph,defs->head,tempNode),lg.moves);
 
-	for(G_nodeList flownodes = G_nodes(flow); flownodes; flownodes = flownodes->tail) {
-		for(Temp_tempList defs = FG_def(flownodes->head); defs; defs = defs->tail) {
-			getOrCreateNode(lg.graph, defs->head, temp_node_table);
-		}
-	}
+	    }
 
-	for(G_nodeList flownodes = G_nodes(flow); flownodes; flownodes = flownodes->tail) {
-		Temp_tempList liveouts = G_look(out_set_table, flownodes->head);
-		if(FG_isMove(flownodes->head)) {
-			liveouts = Temp_Minus(liveouts, FG_use(flownodes->head));
-			for(Temp_tempList defs = FG_def(flownodes->head); defs; defs = defs->tail) {
-				for(Temp_tempList uses = FG_use(flownodes->head); uses; uses = uses->tail) {
-					if(uses->head != F_FP() && defs->head != F_FP()) {
-						lg.moves = Live_Union(lg.moves, Live_MoveList(getOrCreateNode(lg.graph, uses->head, temp_node_table),getOrCreateNode(lg.graph, defs->head, temp_node_table),NULL));
-					}
-        }
-      }
-		}
-
-		for(Temp_tempList defs = FG_def(flownodes->head); defs; defs = defs->tail) {
-			for(Temp_tempList outs = liveouts; outs; outs = outs->tail) {
-				addEdge(lg.graph, defs->head, outs->head, temp_node_table);
-			}
-		}
+	    for(Temp_tempList defs = FG_def(flownodes->head); defs; defs = defs->tail)
+		for(Temp_tempList outs = liveouts; outs; outs = outs->tail)
+		    addEdge(lg.graph, defs->head, outs->head,tempNode);
 	}
 
 	return lg;

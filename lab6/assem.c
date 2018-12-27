@@ -239,7 +239,7 @@ AS_instrList AS_rewriteSpill(F_frame f, AS_instrList il, G_nodeList spills){
     targets = Temp_TempList(t, targets);
     TAB_enter(tab, t, F_allocLocal(f, TRUE));
   }
-  int flen = F_size(f) * F_wordsize;
+  int flen = F_size(f) * F_wordSize;
   AS_instrList newil = NULL;
   for(AS_instrList p=il;p;p=p->tail){
     AS_instr ins = p->head;
