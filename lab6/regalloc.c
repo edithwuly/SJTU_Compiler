@@ -299,6 +299,22 @@ static void AssignColor(){
 	}
 }
 
+void AS_rewrite(AS_instrList iList){
+  	AS_instrList p = iList;
+  	AS_instrList last = NULL;
+  	for(;p;p=p->tail)
+  	{
+    	    AS_instr ins = p->head;
+    	    if(ins->kind == I_MOVE)			
+		if(strstr(ins->u.MOVE.assem,"movq `s0, `d0") && Temp_look(color, ins->u.MOVE.src->head) == Temp_look(color, ins->u.MOVE.dst->head))
+		{
+            	    last->tail = p->tail;  
+            	    continue;          
+        	}
+    	    last = p;
+  	}
+}
+
 struct RA_result RA_regAlloc(F_frame f, AS_instrList il) {
 	G_graph fg = FG_AssemFlowGraph(il);
 	struct Live_graph lg = Live_liveness(fg);
@@ -346,7 +362,7 @@ struct RA_result RA_regAlloc(F_frame f, AS_instrList il) {
 		return RA_regAlloc(f, nil);
 	}
 
-	AS_rewrite(il, color);
+	AS_rewrite(il);
 					
 
 	struct RA_result ret;

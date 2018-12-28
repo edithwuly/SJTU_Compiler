@@ -11,6 +11,14 @@
 #include "liveness.h"
 #include "table.h"
 
+void enterLiveMap(G_table t, G_node flowNode,Temp_tempList temps){
+	G_enter(t,flowNode,temps);
+}
+
+Temp_tempList lookupLiveMap(G_table t, G_node flowNode){
+	return (Temp_tempList)G_look(t,flowNode);
+}
+
 Live_moveList Live_MoveList(G_node src, G_node dst, Live_moveList tail) {
 	Live_moveList lm = (Live_moveList) checked_malloc(sizeof(*lm));
 	lm->src = src;
@@ -112,8 +120,8 @@ struct Live_graph Live_liveness(G_graph flow) {
 	lg.graph = G_Graph();
 	lg.moves = NULL;
 
-	G_table inSet = G_empty();
-	G_table outSet = G_empty();
+	G_table inLive = G_empty();
+	G_table outLive = G_empty();
 	bool done = FALSE;
 
 	while(!done) 
@@ -121,8 +129,8 @@ struct Live_graph Live_liveness(G_graph flow) {
 	    done = TRUE;
 	    for(G_nodeList flownodes = G_nodes(flow); flownodes; flownodes = flownodes->tail) 
 	    {
-		Temp_tempList in_ = G_look(inSet, flownodes->head);
-		Temp_tempList out_ = G_look(outSet, flownodes->head);
+		Temp_tempList in_ = lookupLiveMap(inLive, flownodes->head);
+		Temp_tempList out_ = lookupLiveMap(outLive, flownodes->head);
 		Temp_tempList use = FG_use(flownodes->head);
 		Temp_tempList def = FG_def(flownodes->head);
 
@@ -130,18 +138,18 @@ struct Live_graph Live_liveness(G_graph flow) {
 		Temp_tempList out = NULL;
 
 		for(G_nodeList nodes = G_succ(flownodes->head); nodes; nodes = nodes->tail) 
-		    out = Temp_Union(G_look(inSet, nodes->head), out);
+		    out = Temp_Union(lookupLiveMap(inLive, nodes->head), out);
 			
 		if(!Temp_Equal(in_, in)) 
 		{
 		    done = FALSE;
-		    G_enter(inSet, flownodes->head, in);
+		    enterLiveMap(inLive, flownodes->head, in);
 		}
 
 		if(!Temp_Equal(out_, out)) 
 		{
 		    done = FALSE;
-		    G_enter(outSet, flownodes->head, out);
+		    enterLiveMap(outLive, flownodes->head, out);
 		}
 	    }
 	}
@@ -150,7 +158,7 @@ struct Live_graph Live_liveness(G_graph flow) {
 
 	for(G_nodeList flownodes = G_nodes(flow); flownodes; flownodes = flownodes->tail) 
 	{
-	    Temp_tempList liveouts = G_look(outSet, flownodes->head);
+	    Temp_tempList liveouts = lookupLiveMap(outLive, flownodes->head);
 	    if(FG_isMove(flownodes->head)) 
 	    {
 		liveouts = Temp_Minus(liveouts, FG_use(flownodes->head));

@@ -300,18 +300,18 @@ Temp_temp F_RV(void){
 	return F_RAX();
 }
 
-static Temp_tempList args = NULL;
-Temp_tempList F_Args(){
-	if(!args)
-	    args = Temp_TempList(F_RDI(),Temp_TempList(F_RSI(),Temp_TempList(F_RDX(),Temp_TempList(F_RCX(),Temp_TempList(F_R8(),Temp_TempList(F_R9(),NULL))))));
+static Temp_tempList argregs = NULL;
+Temp_tempList F_Argregs(){
+	if(!argregs)
+	    argregs = Temp_TempList(F_RDI(),Temp_TempList(F_RSI(),Temp_TempList(F_RDX(),Temp_TempList(F_RCX(),Temp_TempList(F_R8(),Temp_TempList(F_R9(),NULL))))));
 	
-	return args;
+	return argregs;
 }
 
 static Temp_tempList callerSave = NULL;
 Temp_tempList F_callerSave(){
 	if(!callerSave)
-	    callerSave = Temp_catList(F_Args(), Temp_TempList(F_R10(), Temp_TempList(F_R11(), NULL)));
+	    callerSave = Temp_catList(F_Argregs(), Temp_TempList(F_R10(), Temp_TempList(F_R11(), NULL)));
 	
 	return callerSave;
 }
@@ -444,11 +444,12 @@ T_stm F_procEntryExit1(F_frame f, T_stm stm){
 	return T_Seq(save,T_Seq(view, T_Seq(stm, restore)));
 }
 
+static Temp_tempList returnSink = NULL;
 AS_instrList F_procEntryExit2(AS_instrList body){
-	static Temp_tempList returnSink = NULL ;
 	if (!returnSink)  
-		returnSink = Temp_TempList(F_SP(), F_calleeSave());
-    return AS_splice(body,AS_InstrList(AS_Oper("ret", NULL, returnSink, NULL), NULL));
+	    returnSink = Temp_TempList(F_SP(), F_calleeSave());
+
+    	return AS_splice(body,AS_InstrList(AS_Oper("ret", NULL, returnSink, NULL), NULL));
 
 }
 

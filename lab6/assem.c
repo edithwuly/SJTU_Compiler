@@ -174,31 +174,6 @@ AS_proc AS_Proc(string p, AS_instrList b, string e)
  return proc;
 }
 
-
-//my part
-void AS_rewrite(AS_instrList iList, Temp_map m){
-  AS_instrList p = iList;
-  AS_instrList last = NULL;
-  for(;p;p=p->tail){
-    AS_instr ins = p->head;
-    if(ins->kind == I_MOVE){
-        Temp_tempList dst = ins->u.MOVE.dst;
-				Temp_tempList src = ins->u.MOVE.src;
-				string ass = ins->u.MOVE.assem;				
-				if(strstr(ass,"movq `s0, `d0")){
-          string s = Temp_look(m, src->head);
-          string d = Temp_look(m, dst->head);
-					if(!strcmp(s,d)){
-            assert(last);
-            last->tail = p->tail;  
-            continue;          
-          }          
-				}
-    }
-    last = p;
-  }
-}
-
 char *strrpc(char *str,char *oldstr,char *newstr){
     char bstr[strlen(str)];
     memset(bstr,0,sizeof(bstr));
