@@ -125,6 +125,7 @@ static void Combine(G_node u, G_node v){
 
 	coalescedNode = G_NodeList(v, coalescedNode);
 	G_enter(alias, v, u);
+	EnableMoves(G_NodeList(v, NULL));
 
 	for(G_nodeList nl=Adjacent(v);nl;nl=nl->tail)
 	{
